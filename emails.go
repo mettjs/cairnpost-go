@@ -120,9 +120,9 @@ type Content struct {
 }
 
 // Get answers what became of an email. A send key sees the emails it
-// sent; an admin key sees any. IsNotFound says there is none: the id is
-// wrong, another key's, or its record was deleted after the server's
-// retention.
+// sent; an admin key sees any, or its sending domain's if it is bound to
+// one. IsNotFound says there is none: the id is wrong, another key's, or
+// its record was deleted after the server's retention.
 func (c *Client) Get(ctx context.Context, id string) (*Message, error) {
 	var m Message
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"emails", id}}, &m); err != nil {
