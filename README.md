@@ -107,7 +107,8 @@ for _, e := range m.Events {
 }
 ```
 
-A send key sees the emails it sent; an admin key sees any.
+A send key sees the emails it sent; an admin key sees any, or its
+sending domain's if it is bound to one.
 `cairnpost.IsNotFound(err)` says there is no such email: the id is wrong,
 another key's, or older than the server keeps records. (A base URL with a
 wrong path answers the same for everything; `Health` tells the two apart.) `m.Content` is what
