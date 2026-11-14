@@ -41,6 +41,25 @@ sent, err := client.Send(ctx, cairnpost.Email{
 `sent.ID` is the email's id. `HTML`, `Text` or both; `Cc`, `Bcc`,
 `ReplyTo` and `Headers` are optional.
 
+Files go with an email as `Attachments`:
+
+```go
+cairnpost.Email{
+	// ...
+	Attachments: []cairnpost.Attachment{
+		{Filename: "invoice.pdf", Content: pdf},
+		// Shown in the HTML body as <img src="cid:logo">.
+		{Filename: "logo.png", Content: logo, ContentID: "logo"},
+	},
+}
+```
+
+`ContentType` is told from the filename when left empty. The server sets
+how many files an email may carry and how large they may be in all (10
+files and 10 MiB by default); it keeps what a file was, never what was in
+it. Whether a file with a `ContentID` can be sent depends on the server's
+mail provider.
+
 An email may name several addresses in `To`, `Cc` and `Bcc` (50 in all,
 unless the server is set otherwise). It is still one email with one id.
 An address on the sending domain's suppression list is left out and the

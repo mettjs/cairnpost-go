@@ -84,6 +84,8 @@ type CapturedEmail struct {
 	HTML     string            `json:"html,omitempty"`
 	Text     string            `json:"text,omitempty"`
 	Headers  map[string]string `json:"headers,omitempty"`
+	// Attachments say what files it had; the server holds no file's bytes.
+	Attachments []File `json:"attachments,omitempty"`
 }
 
 // ErrNotCapturing is Captured asked of a server that delivers for real:

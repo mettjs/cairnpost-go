@@ -60,8 +60,10 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 // whatever went wrong and whatever the server answered.
 func TestNoErrorHoldsTheEmailsWordsOrTheKey(t *testing.T) {
 	email := Email{From: "NAMEMARK <app@example.com>", To: []string{"ana@example.org"}, Subject: "SUBJECTMARK",
-		Text: "TEXTMARK", HTML: "<p>HTMLMARK</p>", Headers: map[string]string{"X-Trace": "HEADERMARK"}}
-	marks := []string{"NAMEMARK", "SUBJECTMARK", "TEXTMARK", "HTMLMARK", "HEADERMARK", "KEYMARK"}
+		Text: "TEXTMARK", HTML: "<p>HTMLMARK</p>", Headers: map[string]string{"X-Trace": "HEADERMARK"},
+		Attachments: []Attachment{{Filename: "FILEMARK.txt", Content: []byte("BYTESMARK")}}}
+	// The last is the file's bytes as they travel.
+	marks := []string{"NAMEMARK", "SUBJECTMARK", "TEXTMARK", "HTMLMARK", "HEADERMARK", "KEYMARK", "FILEMARK", "BYTESMARK", "QllURVNNQVJL"}
 	check := func(why string, err error) {
 		t.Helper()
 		if err == nil {

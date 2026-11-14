@@ -25,10 +25,26 @@ type Email struct {
 	Text string
 	// Headers are extra headers, optional.
 	Headers map[string]string
+	// Attachments are files to send with it, optional.
+	Attachments []Attachment
 	// IdempotencyKey makes a repeated send one email: the same key with
 	// the same content answers the first one's id. Use one for anything
 	// that may be retried. It is remembered for a day by default.
 	IdempotencyKey string
+}
+
+// Attachment is a file sent with an email.
+type Attachment struct {
+	// Filename is the name its reader sees: a name, not a path.
+	Filename string
+	// Content is the file's bytes.
+	Content []byte
+	// ContentType is its media type ("application/pdf"); "" has the
+	// server tell it from the filename.
+	ContentType string
+	// ContentID, when set, makes the file part of the HTML body, which
+	// shows it as "cid:" and this name; "" is a file beside the email.
+	ContentID string
 }
 
 // Sent is the server's answer to a send.
@@ -58,7 +74,10 @@ func (c *Client) Send(ctx context.Context, e Email) (*Sent, error) {
 		HTML    string            `json:"html,omitempty"`
 		Text    string            `json:"text,omitempty"`
 		Headers map[string]string `json:"headers,omitempty"`
-	}{e.From, e.To, e.Cc, e.Bcc, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers}
+		// encoding/json writes a file's bytes in base64, as the server
+		// reads them.
+		Attachments []attachment `json:"attachments,omitempty"`
+	}{e.From, e.To, e.Cc, e.Bcc, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers, attachments(e.Attachments)}
 	k := call{method: http.MethodPost, path: []string{"emails"}, body: body}
 	if e.IdempotencyKey != "" {
 		// A key a header cannot carry as it is would be dropped or changed
@@ -150,15 +169,41 @@ type MessageEvent struct {
 	Detail string `json:"detail,omitempty"`
 }
 
+// attachment is a file as the server takes it.
+type attachment struct {
+	Filename    string `json:"filename"`
+	Content     []byte `json:"content"`
+	ContentType string `json:"content_type,omitempty"`
+	ContentID   string `json:"content_id,omitempty"`
+}
+
+func attachments(files []Attachment) []attachment {
+	var out []attachment
+	for _, f := range files {
+		out = append(out, attachment(f))
+	}
+	return out
+}
+
+// File is what an attachment was: its bytes are kept by no server.
+type File struct {
+	Filename    string `json:"filename"`
+	ContentType string `json:"content_type"`
+	ContentID   string `json:"content_id,omitempty"`
+	Size        int    `json:"size"`
+}
+
 // Content is what an email said, where the server is set to keep that.
 type Content struct {
-	FromName  string            `json:"from_name,omitempty"`
-	ReplyTo   string            `json:"reply_to,omitempty"`
-	Subject   string            `json:"subject"`
-	HTML      string            `json:"html,omitempty"`
-	Text      string            `json:"text,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	KeptUntil time.Time         `json:"kept_until"`
+	FromName string            `json:"from_name,omitempty"`
+	ReplyTo  string            `json:"reply_to,omitempty"`
+	Subject  string            `json:"subject"`
+	HTML     string            `json:"html,omitempty"`
+	Text     string            `json:"text,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	// Attachments say what files went with it.
+	Attachments []File    `json:"attachments,omitempty"`
+	KeptUntil   time.Time `json:"kept_until"`
 }
 
 // Get answers what became of an email. A send key sees the emails it

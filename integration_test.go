@@ -146,6 +146,17 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if len(listed) != 1 || listed[0].Address != gone || listed[0].Reason != ReasonManual || listed[0].Note != "by the test" {
 		t.Fatalf("%+v", listed)
 	}
+	// A file goes with an email, and a development server says what it
+	// was without holding what was in it.
+	if _, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"files@example.org"}, Subject: "With a file " + run, Text: "t",
+		Attachments: []Attachment{{Filename: "note-" + run + ".txt", Content: []byte("hello")}}}); err != nil {
+		t.Fatal(err)
+	}
+	withFile, err := admin.Captured(ctx)
+	if held := withFile; err != nil || len(held) == 0 || len(held[0].Attachments) != 1 || held[0].Attachments[0].Filename != "note-"+run+".txt" ||
+		held[0].Attachments[0].Size != 5 || !strings.HasPrefix(held[0].Attachments[0].ContentType, "text/plain") {
+		t.Fatalf("the captured file: %+v %v", held, err)
+	}
 	// Among several, a suppressed address is left out and named; the email
 	// is one, with an outcome for each address it went to.
 	several, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"ana@example.org", gone},
