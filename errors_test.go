@@ -128,3 +128,42 @@ func TestRetryAfterAsADateIsRead(t *testing.T) {
 		t.Fatalf("%+v", problem)
 	}
 }
+
+// A path the server does not have is not a missing record: a client
+// pointed at a wrong address must not read every email as gone. Nor is a
+// 404 from something else at that address.
+func TestAWrongAddressIsNotAMissingRecord(t *testing.T) {
+	for name, c := range map[string]struct {
+		status       int
+		body         string
+		missing, off bool
+	}{
+		"a record that is not there": {404, `{"statusCode":404,"name":"not_found","message":"No email has this id."}`, true, false},
+		"a path that is not there":   {404, `{"statusCode":404,"name":"route_not_found","message":"There is nothing at this path."}`, false, true},
+		"a method the path refuses":  {405, `{"statusCode":405,"name":"method_not_allowed","message":"This path does not take PUT."}`, false, true},
+		"a proxy's own 404":          {404, `<html>not here</html>`, false, true},
+		"a refusal":                  {422, `{"statusCode":422,"name":"validation_error","message":"no"}`, false, false},
+	} {
+		_, client := serve(t, c.status, c.body)
+		_, err := client.Get(ctx, "0199")
+		if IsNotFound(err) != c.missing || IsWrongAddress(err) != c.off {
+			t.Errorf("%s: missing %v, wrong address %v: %v", name, IsNotFound(err), IsWrongAddress(err), err)
+		}
+	}
+	// The server's own sentence is kept, so the error says what to check.
+	_, client := serve(t, 404, `{"statusCode":404,"name":"route_not_found","message":"There is nothing at this path. Check the path and the server's address."}`)
+	if _, err := client.Get(ctx, "0199"); err == nil || !strings.Contains(err.Error(), "Check the path and the server's address") {
+		t.Fatalf("%v", err)
+	}
+	// A redirect is something else answering at that address too.
+	_, client = serving(t, func(w http.ResponseWriter, _ int) {
+		w.Header().Set("Location", "/elsewhere")
+		w.WriteHeader(http.StatusPermanentRedirect)
+	})
+	if _, err := client.Get(ctx, "0199"); !IsWrongAddress(err) || IsNotFound(err) {
+		t.Fatalf("a redirect: %v", err)
+	}
+	if IsWrongAddress(nil) || IsWrongAddress(&TransportError{}) {
+		t.Fatal("no answer at all is not a wrong address")
+	}
+}

@@ -20,19 +20,26 @@ const (
 	ErrDomainNotAllowed   = "domain_not_allowed"
 	ErrAdminKeyRequired   = "admin_key_required"
 	ErrNotFound           = "not_found"
-	ErrTooLarge           = "request_too_large"
-	ErrRateLimited        = "rate_limit_exceeded"
-	ErrUpstreamUnknown    = "upstream_unknown"
-	ErrUpstreamDown       = "upstream_unavailable"
-	ErrUnavailable        = "unavailable"
-	ErrInternal           = "internal_error"
+	// ErrRouteNotFound: the server has nothing at the path asked for. The
+	// base URL is wrong, or the server is older than this client.
+	ErrRouteNotFound = "route_not_found"
+	// ErrMethodNotAllowed: the path is there and does not take the
+	// method. The server is older or newer than this client.
+	ErrMethodNotAllowed = "method_not_allowed"
+	ErrTooLarge         = "request_too_large"
+	ErrRateLimited      = "rate_limit_exceeded"
+	ErrUpstreamUnknown  = "upstream_unknown"
+	ErrUpstreamDown     = "upstream_unavailable"
+	ErrUnavailable      = "unavailable"
+	ErrInternal         = "internal_error"
 )
 
 // known is every name above: an answer under one of them is CairnPost's.
 var known = map[string]bool{
 	ErrValidation: true, ErrRejectedByUpstream: true, ErrRecipientSuppress: true, ErrIdempotentMismatch: true,
 	ErrIdempotentInFlight: true, ErrMissingKey: true, ErrInvalidKey: true, ErrDomainNotAllowed: true,
-	ErrAdminKeyRequired: true, ErrNotFound: true, ErrTooLarge: true, ErrRateLimited: true,
+	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
+	ErrTooLarge: true, ErrRateLimited: true,
 	ErrUpstreamUnknown: true, ErrUpstreamDown: true, ErrUnavailable: true, ErrInternal: true,
 }
 

@@ -2,6 +2,7 @@ package cairnpost
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -55,7 +56,9 @@ type Health struct {
 func (h *Health) OK() bool { return h.Status == "ok" }
 
 // Health asks the server how it is. It needs no key. A server that is up
-// but cannot reach its database is answered, not an error: see OK.
+// but cannot reach its database is answered, not an error: see OK. With a
+// base URL that is wrong it fails as any call does, and IsWrongAddress
+// says so: it is the call to check a configuration with.
 func (c *Client) Health(ctx context.Context) (*Health, error) {
 	var h Health
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"health"}, plain: true}, &h); err != nil {
@@ -81,13 +84,28 @@ type CapturedEmail struct {
 	Headers  map[string]string `json:"headers,omitempty"`
 }
 
+// ErrNotCapturing is Captured asked of a server that delivers for real:
+// it keeps no emails to show.
+var ErrNotCapturing = errors.New("cairnpost: the server delivers for real and keeps no captured emails")
+
 // Captured answers the emails a server running the capture driver holds,
-// newest first: what would have been sent. For development and tests;
-// IsNotFound says the server delivers for real. Admin key.
+// newest first: what would have been sent. For development and tests. A
+// server that delivers for real has no such list: the error is then
+// ErrNotCapturing (ask with errors.Is), unless Health fails too, in which
+// case the base URL is what is wrong. Admin key.
 func (c *Client) Captured(ctx context.Context) ([]CapturedEmail, error) {
 	var out struct {
 		Data []CapturedEmail `json:"data"`
 	}
 	err := c.do(ctx, call{method: http.MethodGet, path: []string{"capture", "emails"}}, &out)
+	var problem *Error
+	if errors.As(err, &problem) && problem.Name == ErrRouteNotFound {
+		// The path is not there. If the server is, it is one that does
+		// not capture; if it is not, that is the error to give.
+		if _, down := c.Health(ctx); down != nil {
+			return nil, err
+		}
+		return nil, ErrNotCapturing
+	}
 	return out.Data, err
 }

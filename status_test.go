@@ -1,6 +1,9 @@
 package cairnpost
 
 import (
+	"errors"
+	"io"
+	"net/http"
 	"testing"
 )
 
@@ -26,5 +29,45 @@ func TestLimitsHealthAndCaptured(t *testing.T) {
 	_, c = serve(t, 200, `{"data":[{"id":"c1","from":"app@example.com","to":"ana@example.org","subject":"Hello","text":"Body"}]}`)
 	if held, err := c.Captured(ctx); err != nil || len(held) != 1 || held[0].Subject != "Hello" {
 		t.Fatalf("%+v %v", held, err)
+	}
+}
+
+// A base URL that is wrong fails Health as it fails any call, so a
+// configuration can be checked with it.
+func TestHealthSaysAWrongAddress(t *testing.T) {
+	for name, c := range map[string]struct {
+		status int
+		body   string
+	}{
+		"a path the server does not have": {404, `{"statusCode":404,"name":"route_not_found","message":"There is nothing at this path."}`},
+		"something else at that address":  {404, `<html>not here</html>`},
+	} {
+		_, client := serve(t, c.status, c.body)
+		if _, err := client.Health(ctx); !IsWrongAddress(err) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// A server that delivers for real has no captured emails to show, which
+// is not a wrong address: the server is there. With nothing of
+// CairnPost's at the address at all, the wrong address is what is said.
+func TestCapturedOfAServerThatDeliversForReal(t *testing.T) {
+	const nothing = `{"statusCode":404,"name":"route_not_found","message":"There is nothing at this path."}`
+	s, c := serving(t, func(w http.ResponseWriter, n int) {
+		if n == 1 {
+			w.WriteHeader(404)
+			io.WriteString(w, nothing)
+			return
+		}
+		io.WriteString(w, `{"status":"ok","driver":"cloudflare","version":"dev"}`)
+	})
+	if held, err := c.Captured(ctx); !errors.Is(err, ErrNotCapturing) || held != nil || IsWrongAddress(err) ||
+		len(s.seen) != 2 || s.seen[1].path != "/health" {
+		t.Fatalf("%+v %v %+v", held, err, s.seen)
+	}
+	_, c = serve(t, 404, nothing)
+	if _, err := c.Captured(ctx); errors.Is(err, ErrNotCapturing) || !IsWrongAddress(err) {
+		t.Fatalf("a wrong base URL: %v", err)
 	}
 }
