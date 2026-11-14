@@ -95,7 +95,8 @@ for i, r := range results {
 A nil error says the batch was taken, not that every email went: read
 each result, or count with `cairnpost.Failed(results)`. With an
 `IdempotencyKey` on the batch, the same batch sent again (the same emails
-in the same order) sends only what did not go. The server sets how many
+in the same order) sends only what did not go. Each failed email's
+`RetryAfter` is its own. The server sets how many
 emails a batch may hold (100 by default) and how long it may take; a
 server given more than its default minute wants a client with a longer
 timeout than `DefaultTimeout`.
@@ -155,9 +156,10 @@ The client does not follow redirects, which would turn a send into a
 request with no email in it: give `New` the server's own address. An API
 key is sent without the spaces or newline around it.
 
-The client's own HTTP timeout is two minutes, longer than the server
-takes for its slowest answer: a batch, which starts emails for a minute
-and then waits for the mail provider on the last of them. If you pass
+The client's own HTTP timeout is two and a half minutes, longer than the
+server takes for its slowest answer: a batch, which may take 30 seconds
+to arrive, starts emails for a minute and then waits for the mail
+provider on the last of them, two minutes in all. If you pass
 your own `http.Client` with `WithHTTPClient`, keep its timeout above that
 (and higher still if the server's send or batch timeout was raised): a
 client that gives up first cannot know whether its emails went.

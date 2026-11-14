@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // Batch is several emails to send in one request.
@@ -59,11 +60,11 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 				Name    string `json:"name"`
 				Message string `json:"message"`
 				ID      string `json:"id"`
+				Wait    int    `json:"retry_after"`
 			} `json:"error"`
 		} `json:"data"`
 	}
-	wait, err := c.doWaiting(ctx, k, &out)
-	if err != nil {
+	if err := c.do(ctx, k, &out); err != nil {
 		return nil, err
 	}
 	if len(out.Data) != len(b.Emails) {
@@ -73,10 +74,13 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 	results := make([]BatchResult, len(out.Data))
 	for i, d := range out.Data {
 		switch {
-		case d.Error != nil && known[d.Error.Name]:
-			problem := &Error{Status: d.Error.Status, Name: d.Error.Name, Message: d.Error.Message, EmailID: d.Error.ID}
-			if problem.Retryable() {
-				problem.RetryAfter = wait
+		case d.Error != nil && d.Error.Status >= 400 && d.Error.Status <= 599:
+			problem := &Error{Status: d.Error.Status}
+			// Under a name this client does not know, only the status
+			// is believed, as for an answer that is not CairnPost's.
+			if known[d.Error.Name] {
+				problem.Name, problem.Message, problem.EmailID = d.Error.Name, d.Error.Message, d.Error.ID
+				problem.RetryAfter = time.Duration(max(d.Error.Wait, 0)) * time.Second
 			}
 			results[i].Err = problem
 		case d.Error == nil && d.ID != "":

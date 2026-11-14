@@ -15,10 +15,10 @@ var two = Batch{IdempotencyKey: "run-7", Emails: []Email{
 
 func TestSendBatchAnswersEachEmailInItsPlace(t *testing.T) {
 	s, c := serving(t, func(w http.ResponseWriter, _ int) {
-		w.Header().Set("Retry-After", "30")
+		w.Header().Set("Retry-After", "90")
 		w.WriteHeader(207)
 		io.WriteString(w, `{"data":[{"id":"msg-1","suppressed":["cy@example.org"]},
-			{"error":{"statusCode":429,"name":"rate_limit_exceeded","message":"Later."}}]}`)
+			{"error":{"statusCode":429,"name":"rate_limit_exceeded","message":"Later.","retry_after":30}}]}`)
 	})
 	got, err := c.SendBatch(ctx, two)
 	if err != nil || len(got) != 2 || got[0].Err != nil || got[0].Sent.ID != "msg-1" || len(got[0].Sent.Suppressed) != 1 || Failed(got) != 1 {
@@ -70,12 +70,36 @@ func TestABatchIsNotSentWithAKeyOnAnEmail(t *testing.T) {
 // CairnPost's: any of them may have gone.
 func TestABatchAnswerThatIsNotCairnPostsIsNotTrusted(t *testing.T) {
 	for _, body := range []string{`{}`, `{"data":[{"id":"msg-1"}]}`, `{"data":[{"id":"msg-1"},{}]}`,
-		`{"data":[{"id":"msg-1"},{"error":{"statusCode":500,"name":"made_up","message":"x"}}]}`} {
+		`{"data":[{"id":"msg-1"},{"error":{"statusCode":200,"name":"made_up","message":"x"}}]}`} {
 		_, c := serve(t, 200, body)
 		got, err := c.SendBatch(ctx, two)
 		var transport *TransportError
 		if got != nil || !errors.As(err, &transport) || !MayHaveSent(err) {
 			t.Errorf("%s: %+v %v", body, got, err)
 		}
+	}
+}
+
+// An error under a name this client does not know is still that email's
+// alone: the others' ids are kept, and nothing of its words is believed.
+func TestAnErrorThisClientDoesNotKnowIsOneEmails(t *testing.T) {
+	_, c := serve(t, 207, `{"data":[{"id":"msg-1"},
+		{"error":{"statusCode":503,"name":"made_up","message":"SUBJECTMARKQ","retry_after":9}},
+		{"error":{"statusCode":502,"name":"upstream_unknown","message":"Lost.","id":"msg-3"}},
+		{"error":{"statusCode":503,"name":"upstream_unavailable","message":"Down."}}]}`)
+	four := Batch{Emails: append(append([]Email{}, two.Emails...), two.Emails...)}
+	got, err := c.SendBatch(ctx, four)
+	if err != nil || got[0].Sent.ID != "msg-1" || Failed(got) != 3 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	odd := got[1].Err.(*Error)
+	if odd.Name != "" || odd.Message != "" || odd.RetryAfter != 0 || odd.Status != 503 || !MayHaveSent(odd) {
+		t.Errorf("the unknown error: %+v", odd)
+	}
+	if lost := got[2].Err.(*Error); !MayHaveSent(lost) || lost.EmailID != "msg-3" {
+		t.Errorf("the lost answer: %+v", lost)
+	}
+	if down := got[3].Err.(*Error); MayHaveSent(down) || down.RetryAfter != 0 || !down.Retryable() {
+		t.Errorf("the provider down: %+v", down)
 	}
 }

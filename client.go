@@ -19,11 +19,13 @@ import (
 const Version = "0.1.0-dev"
 
 // DefaultTimeout is how long a call may take with the client's own HTTP
-// client. It is longer than the server gives its slowest answer (a
-// batch, which by the server's own settings may take a minute and a
-// half): a client that gave up sooner would not know whether its emails
-// went. A server set to give a batch longer wants a client given longer.
-const DefaultTimeout = 2 * time.Minute
+// client. It is longer than the server gives its slowest answer, a
+// batch: by the server's own settings that is 30 seconds for the request
+// to arrive, a minute of starting emails, and the last send and its
+// record (10 and 20 seconds), two minutes in all. A client that gave up
+// sooner would not know whether its emails went. A server set to give a
+// send or a batch longer wants a client given longer.
+const DefaultTimeout = 150 * time.Second
 
 // DefaultMaxAnswerBytes is how much of an answer is read unless
 // WithMaxAnswerBytes says otherwise. Only a development server's list of
