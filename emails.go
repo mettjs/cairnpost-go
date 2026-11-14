@@ -7,12 +7,16 @@ import (
 	"time"
 )
 
-// Email is one email to one recipient.
+// Email is one email, to one address or several.
 type Email struct {
 	// From is the sender: "app@example.com" or "App <app@example.com>".
 	From string
-	// To is the one recipient's address.
-	To string
+	// To is who the email is for: one address at least. Cc are copied in
+	// the open, Bcc without the others seeing them. No address twice;
+	// the server says how many an email may name in all (50 by default).
+	To  []string
+	Cc  []string
+	Bcc []string
 	// ReplyTo is optional.
 	ReplyTo string
 	Subject string
@@ -27,42 +31,56 @@ type Email struct {
 	IdempotencyKey string
 }
 
+// Sent is the server's answer to a send.
+type Sent struct {
+	// ID is the email's id: one, however many addresses it went to.
+	ID string
+	// Suppressed are the addresses it was not sent to, because they are
+	// on the sending domain's suppression list. Empty when it went to
+	// all. An email whose every address is suppressed is an error
+	// instead (ErrRecipientSuppress).
+	Suppressed []string
+}
+
 // Send sends an email and answers its id once the mail provider has taken
 // it. On an error, see Error for what to do and MayHaveSent for whether
 // the email may have gone; the error's EmailID, when set, can be read
 // with Get.
-func (c *Client) Send(ctx context.Context, e Email) (string, error) {
+func (c *Client) Send(ctx context.Context, e Email) (*Sent, error) {
 	// Only the fields the server names: it refuses any other.
 	body := struct {
 		From    string            `json:"from"`
-		To      string            `json:"to"`
+		To      []string          `json:"to"`
+		Cc      []string          `json:"cc,omitempty"`
+		Bcc     []string          `json:"bcc,omitempty"`
 		ReplyTo string            `json:"reply_to,omitempty"`
 		Subject string            `json:"subject"`
 		HTML    string            `json:"html,omitempty"`
 		Text    string            `json:"text,omitempty"`
 		Headers map[string]string `json:"headers,omitempty"`
-	}{e.From, e.To, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers}
+	}{e.From, e.To, e.Cc, e.Bcc, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers}
 	k := call{method: http.MethodPost, path: []string{"emails"}, body: body}
 	if e.IdempotencyKey != "" {
 		// A key a header cannot carry as it is would be dropped or changed
 		// on the way, and the send would quietly not be idempotent.
 		if !headerSafe(e.IdempotencyKey) {
-			return "", errors.New("cairnpost: the IdempotencyKey must have no control characters and no space at either end; nothing was sent")
+			return nil, errors.New("cairnpost: the IdempotencyKey must have no control characters and no space at either end; nothing was sent")
 		}
 		k.header = http.Header{"Idempotency-Key": {e.IdempotencyKey}}
 	}
 	var out struct {
-		ID string `json:"id"`
+		ID         string   `json:"id"`
+		Suppressed []string `json:"suppressed"`
 	}
 	if err := c.do(ctx, k, &out); err != nil {
-		return "", err
+		return nil, err
 	}
 	if out.ID == "" {
 		// A 2xx with no id is not CairnPost's answer: whatever is at that
 		// address, the email is not known to have been sent.
-		return "", &TransportError{cause: errNotCairnPost}
+		return nil, &TransportError{cause: errNotCairnPost}
 	}
-	return out.ID, nil
+	return &Sent{ID: out.ID, Suppressed: out.Suppressed}, nil
 }
 
 // States of an email.
@@ -79,12 +97,15 @@ const (
 
 // Message is what became of an email.
 type Message struct {
-	ID        string    `json:"id"`
-	From      string    `json:"from"`
-	To        string    `json:"to"`
-	State     string    `json:"state"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID   string `json:"id"`
+	From string `json:"from"`
+	// To is the first address the email went to, and State what became
+	// of it there. Recipients has every address with its own.
+	To         string      `json:"to"`
+	State      string      `json:"state"`
+	Recipients []Recipient `json:"recipients"`
+	CreatedAt  time.Time   `json:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at"`
 	// Events are what happened to it after it was sent, oldest first.
 	Events []MessageEvent `json:"events"`
 	// Content is what the email said: nil unless the server keeps content,
@@ -92,11 +113,29 @@ type Message struct {
 	Content *Content `json:"content,omitempty"`
 }
 
+// Kinds of recipient.
+const (
+	KindTo  = "to"
+	KindCc  = "cc"
+	KindBcc = "bcc"
+)
+
+// Recipient is one address of an email and what became of it there.
+type Recipient struct {
+	Address string `json:"address"`
+	// Kind is KindTo, KindCc or KindBcc.
+	Kind      string    `json:"kind"`
+	State     string    `json:"state"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // MessageEvent is one thing that happened to an email.
 type MessageEvent struct {
 	// Type is "delivered", "deferred", "bounced", "complained" or "failed".
 	Type string    `json:"type"`
 	At   time.Time `json:"at"`
+	// To is the address it happened at.
+	To string `json:"to,omitempty"`
 	// Permanent says, for a bounce, that the address will never take mail.
 	Permanent bool `json:"permanent,omitempty"`
 	// Code is the receiving server's status ("5.1.1"); Reason the mail

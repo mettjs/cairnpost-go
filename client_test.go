@@ -99,7 +99,7 @@ func TestARedirectIsNotFollowed(t *testing.T) {
 		w.Header().Set("Location", "/elsewhere")
 		w.WriteHeader(http.StatusMovedPermanently)
 	})
-	_, err := c.Send(ctx, Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t"})
+	_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"})
 	var problem *Error
 	if !errors.As(err, &problem) || problem.Status != 301 || len(s.seen) != 1 || IsNotFound(err) ||
 		!strings.Contains(err.Error(), "redirect") {
@@ -145,7 +145,7 @@ func TestASendIsMadeOnceEvenWhenTheConnectionDrops(t *testing.T) {
 		if _, err := c.Health(ctx); err != nil {
 			t.Fatal(err)
 		}
-		_, err := c.Send(context.Background(), Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t", IdempotencyKey: key})
+		_, err := c.Send(context.Background(), Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t", IdempotencyKey: key})
 		var transport *TransportError
 		if !errors.As(err, &transport) || !MayHaveSent(err) || posts.Load() != 1 {
 			t.Errorf("key %q: %d requests reached the server, %v", key, posts.Load(), err)

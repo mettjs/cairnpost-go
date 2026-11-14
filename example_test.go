@@ -17,9 +17,9 @@ func ExampleClient_Send() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	id, err := client.Send(context.Background(), cairnpost.Email{
+	sent, err := client.Send(context.Background(), cairnpost.Email{
 		From:    "Example <hello@example.com>",
-		To:      "ana@example.org",
+		To:      []string{"ana@example.org"},
 		Subject: "Welcome",
 		Text:    "Glad you are here.",
 		// The same key and content, sent again, is the same email.
@@ -27,7 +27,7 @@ func ExampleClient_Send() {
 	})
 	switch {
 	case err == nil:
-		fmt.Println("sent:", id)
+		fmt.Println("sent:", sent.ID)
 	case cairnpost.MayHaveSent(err):
 		// It is not known whether it went. Send again later with the same
 		// IdempotencyKey, and only with it: a first try the server knows
@@ -41,7 +41,7 @@ func ExampleClient_Send() {
 func ExampleError() {
 	client, _ := cairnpost.New("https://mail.example.com", "cp_...")
 	_, err := client.Send(context.Background(), cairnpost.Email{
-		From: "hello@example.com", To: "ana@example.org", Subject: "Welcome", Text: "Hi",
+		From: "hello@example.com", To: []string{"ana@example.org"}, Subject: "Welcome", Text: "Hi",
 		IdempotencyKey: "welcome-user-42",
 	})
 	var problem *cairnpost.Error

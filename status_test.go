@@ -26,7 +26,7 @@ func TestLimitsHealthAndCaptured(t *testing.T) {
 	if _, err := c.Health(ctx); err == nil {
 		t.Fatal("something that is not CairnPost was taken as healthy")
 	}
-	_, c = serve(t, 200, `{"data":[{"id":"c1","from":"app@example.com","to":"ana@example.org","subject":"Hello","text":"Body"}]}`)
+	_, c = serve(t, 200, `{"data":[{"id":"c1","from":"app@example.com","to":["ana@example.org"],"cc":["bo@example.org"],"subject":"Hello","text":"Body"}]}`)
 	if held, err := c.Captured(ctx); err != nil || len(held) != 1 || held[0].Subject != "Hello" {
 		t.Fatalf("%+v %v", held, err)
 	}
