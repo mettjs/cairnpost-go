@@ -31,7 +31,10 @@ const (
 	ErrUpstreamUnknown  = "upstream_unknown"
 	ErrUpstreamDown     = "upstream_unavailable"
 	ErrUnavailable      = "unavailable"
-	ErrInternal         = "internal_error"
+	// ErrNotStarted: a batch ended before this email's turn. Nothing of
+	// it was sent.
+	ErrNotStarted = "not_started"
+	ErrInternal   = "internal_error"
 )
 
 // known is every name above: an answer under one of them is CairnPost's.
@@ -41,6 +44,7 @@ var known = map[string]bool{
 	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
 	ErrTooLarge: true, ErrRateLimited: true,
 	ErrUpstreamUnknown: true, ErrUpstreamDown: true, ErrUnavailable: true, ErrInternal: true,
+	ErrNotStarted: true,
 }
 
 // Error is CairnPost saying no. Status and Name say what to do:
@@ -112,13 +116,18 @@ func problemOf(res *http.Response, raw []byte) *Error {
 	if known[body.Name] {
 		e.Name, e.Message, e.EmailID = body.Name, body.Message, body.ID
 	}
-	// Retry-After is seconds from CairnPost, and may be a date from a
-	// proxy.
+	e.RetryAfter = waitOf(res)
+	return e
+}
+
+// waitOf is how long an answer asks to wait, zero when it does not say.
+// Retry-After is seconds from CairnPost, and may be a date from a proxy.
+func waitOf(res *http.Response) time.Duration {
 	after := res.Header.Get("Retry-After")
 	if secs, err := strconv.Atoi(after); err == nil && secs > 0 {
-		e.RetryAfter = time.Duration(secs) * time.Second
+		return time.Duration(secs) * time.Second
 	} else if at, err := http.ParseTime(after); err == nil && time.Until(at) > 0 {
-		e.RetryAfter = time.Until(at).Round(time.Second)
+		return time.Until(at).Round(time.Second)
 	}
-	return e
+	return 0
 }

@@ -58,26 +58,33 @@ type Sent struct {
 	Suppressed []string
 }
 
+// wire is an email as the server takes it: only the fields it names,
+// since it refuses any other.
+type wire struct {
+	From    string            `json:"from"`
+	To      []string          `json:"to"`
+	Cc      []string          `json:"cc,omitempty"`
+	Bcc     []string          `json:"bcc,omitempty"`
+	ReplyTo string            `json:"reply_to,omitempty"`
+	Subject string            `json:"subject"`
+	HTML    string            `json:"html,omitempty"`
+	Text    string            `json:"text,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+	// encoding/json writes a file's bytes in base64, as the server
+	// reads them.
+	Attachments []attachment `json:"attachments,omitempty"`
+}
+
+func wireOf(e Email) wire {
+	return wire{e.From, e.To, e.Cc, e.Bcc, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers, attachments(e.Attachments)}
+}
+
 // Send sends an email and answers its id once the mail provider has taken
 // it. On an error, see Error for what to do and MayHaveSent for whether
 // the email may have gone; the error's EmailID, when set, can be read
 // with Get.
 func (c *Client) Send(ctx context.Context, e Email) (*Sent, error) {
-	// Only the fields the server names: it refuses any other.
-	body := struct {
-		From    string            `json:"from"`
-		To      []string          `json:"to"`
-		Cc      []string          `json:"cc,omitempty"`
-		Bcc     []string          `json:"bcc,omitempty"`
-		ReplyTo string            `json:"reply_to,omitempty"`
-		Subject string            `json:"subject"`
-		HTML    string            `json:"html,omitempty"`
-		Text    string            `json:"text,omitempty"`
-		Headers map[string]string `json:"headers,omitempty"`
-		// encoding/json writes a file's bytes in base64, as the server
-		// reads them.
-		Attachments []attachment `json:"attachments,omitempty"`
-	}{e.From, e.To, e.Cc, e.Bcc, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers, attachments(e.Attachments)}
+	body := wireOf(e)
 	k := call{method: http.MethodPost, path: []string{"emails"}, body: body}
 	if e.IdempotencyKey != "" {
 		// A key a header cannot carry as it is would be dropped or changed
