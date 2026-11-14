@@ -110,3 +110,31 @@ func TestGetReadsEachAddressOfAnEmail(t *testing.T) {
 		t.Fatalf("%+v %v", m, err)
 	}
 }
+
+func TestFilesGoInBase64AndTheirDescriptionIsRead(t *testing.T) {
+	s, c := serve(t, 200, `{"id":"msg-3"}`)
+	if _, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", HTML: "<img src=cid:logo>",
+		Attachments: []Attachment{{Filename: "invoice.pdf", Content: []byte("%PDF-1")},
+			{Filename: "logo.png", Content: []byte{0, 1, 2}, ContentType: "image/png", ContentID: "logo"}}}); err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Attachments []map[string]any
+	}
+	if err := json.Unmarshal([]byte(s.seen[0].body), &body); err != nil || len(body.Attachments) != 2 ||
+		body.Attachments[0]["content"] != "JVBERi0x" || len(body.Attachments[0]) != 2 ||
+		body.Attachments[1]["content_type"] != "image/png" || body.Attachments[1]["content_id"] != "logo" {
+		t.Fatalf("%s %v", s.seen[0].body, err)
+	}
+	// With no files the field is not sent: the server would take it, an
+	// older one would not.
+	if _, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"}); err != nil ||
+		strings.Contains(s.seen[1].body, "attachments") {
+		t.Fatalf("%v %s", err, s.seen[1].body)
+	}
+	_, c = serve(t, 200, `{"id":"m","content":{"subject":"s","attachments":[{"filename":"invoice.pdf","content_type":"application/pdf","size":6}]}}`)
+	m, err := c.Get(ctx, "m")
+	if err != nil || m.Content == nil || len(m.Content.Attachments) != 1 || m.Content.Attachments[0] != (File{Filename: "invoice.pdf", ContentType: "application/pdf", Size: 6}) {
+		t.Fatalf("%+v %v", m, err)
+	}
+}

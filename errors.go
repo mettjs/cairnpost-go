@@ -87,7 +87,9 @@ func (e *Error) Error() string {
 // retry only with the same Idempotency-Key.
 func (e *Error) Retryable() bool {
 	switch {
-	case e.Name == ErrIdempotentInFlight, e.Status == http.StatusTooManyRequests:
+	case e.Name == ErrIdempotentInFlight, e.Status == http.StatusTooManyRequests, e.Status == http.StatusRequestTimeout:
+		// The last is a request that did not arrive whole: nothing was
+		// done with it.
 		return true
 	case e.Status == http.StatusConflict:
 		return false

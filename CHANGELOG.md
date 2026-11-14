@@ -14,6 +14,9 @@ Every change a user of this client can notice is written here. The format is
   `Sent` with the email's `ID` and, under `Suppressed`, the addresses it
   was not sent to, which `Message.Suppressed` says later; `Message.Recipients` says what became of the email at
   each address, and each `MessageEvent` names its address in `To`.
+- Attachments: `Email.Attachments` sends files with an email, beside it or
+  shown in its HTML by a `ContentID`. `Content.Attachments` and
+  `CapturedEmail.Attachments` say what the files were.
 - `Error`, `TransportError`, `MayHaveSent`, `IsNotFound` and
   `IsWrongAddress`: what the server refused, whether trying again is right,
   whether an email may have gone, and whether the base URL is at fault

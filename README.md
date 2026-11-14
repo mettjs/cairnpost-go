@@ -41,6 +41,26 @@ sent, err := client.Send(ctx, cairnpost.Email{
 `sent.ID` is the email's id. `HTML`, `Text` or both; `Cc`, `Bcc`,
 `ReplyTo` and `Headers` are optional.
 
+Files go with an email as `Attachments`:
+
+```go
+cairnpost.Email{
+	// ...
+	Attachments: []cairnpost.Attachment{
+		{Filename: "invoice.pdf", Content: pdf},
+		// Shown in the HTML body as <img src="cid:logo">.
+		{Filename: "logo.png", Content: logo, ContentID: "logo"},
+	},
+}
+```
+
+`ContentType` is told from the filename when left empty. The server sets
+how many files an email may carry and how large they may be in all (10
+files and 10 MiB by default). It never keeps what was in a file, and
+keeps what the file was (name, type, size) only where it is set to keep
+what emails say. Whether a file with a `ContentID` can be sent depends on the server's
+mail provider.
+
 An email may name several addresses in `To`, `Cc` and `Bcc` (50 in all,
 unless the server is set otherwise). It is still one email with one id.
 An address on the sending domain's suppression list is left out and the
@@ -85,7 +105,7 @@ default:
 |---|---|
 | `*Error`, status 422 | The request is at fault and will never succeed. `recipient_suppressed` is one of them. |
 | `*Error`, 409 `invalid_idempotent_request` | The key was used for a different email, which was sent. |
-| `*Error`, 409 `concurrent_idempotent_requests`, 429, 503 | Nothing was sent. Try again, after `RetryAfter` when set. |
+| `*Error`, 409 `concurrent_idempotent_requests`, 408, 429, 503 | Nothing was sent. Try again, after `RetryAfter` when set. A 408 is a request that did not arrive whole in time, a 503 can be a server busy with other large emails. |
 | `*Error`, 502 `upstream_unknown` | The mail provider did not answer. The email may have gone. |
 | `*Error`, any other 5xx but the 503s above | The server failed after it began, or something in between answered for it (a proxy's 502). The email may have gone. |
 | `*TransportError` | The server was not reached, or its answer never came. For a send, the email may have gone. |
