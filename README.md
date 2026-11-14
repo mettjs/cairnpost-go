@@ -110,8 +110,14 @@ for _, e := range m.Events {
 A send key sees the emails it sent; an admin key sees any, or its
 sending domain's if it is bound to one.
 `cairnpost.IsNotFound(err)` says there is no such email: the id is wrong,
-another key's, or older than the server keeps records. (A base URL with a
-wrong path answers the same for everything; `Health` tells the two apart.) `m.Content` is what
+another key's, or older than the server keeps records.
+`cairnpost.IsWrongAddress(err)` says something else: the request reached
+no route of CairnPost's, so the base URL given to `New` is most likely
+wrong, and no record is known to be missing. `Health` fails the same way
+on a wrong base URL, so it is the call to check a configuration with.
+(Both need the server's own error answers to arrive: a proxy that puts its
+own page in place of every 404 makes a missing record read as a wrong
+address.) `m.Content` is what
 the email said, set only when the server keeps content and the key is an
 admin key.
 
@@ -155,6 +161,12 @@ http.HandleFunc("/webhooks/cairnpost", func(w http.ResponseWriter, r *http.Reque
   `event.Email.Bounce` for `email.bounced`; a webhook that lacks them is
   refused (`ErrPayload`). `event.Email` is nil for `webhook.test`, the
   webhook sent to try an endpoint out.
+- `address.suppressed` (`cairnpost.EventAddressSuppressed`) tells of an
+  address suppressed because of a bounce or a complaint about an email
+  the server has no record of. It names no email: `event.Suppression`
+  holds the sending domain, the address and the reason (`ReasonBounce` or
+  `ReasonComplaint`). Treat it as you treat an `email.bounced` or an
+  `email.complained` with `Suppressed` set.
 - Make the verifier with `NewVerifier`. The zero `Verifier` has no secret
   and refuses everything.
 - An `Event` can be passed on as JSON (to a queue, say) and read back
@@ -179,6 +191,11 @@ w, err := admin.CreateWebhook(ctx, cairnpost.NewWebhook{
 fmt.Println(w.Secret)
 
 res, err := admin.TestWebhook(ctx, w.ID) // sends a webhook.test now
+
+// A new signing secret, said only here. Until w.PreviousSecretUntil the
+// server signs with the old one too: change the application's secret
+// within that time. If it is nil, the old one has stopped already.
+w, err = admin.RotateWebhookSecret(ctx, w.ID)
 
 off := false
 admin.UpdateWebhook(ctx, w.ID, cairnpost.WebhookChange{Enabled: &off})
@@ -206,14 +223,22 @@ admin.LiftAll(ctx, "example.com", cairnpost.ReasonBounce)
 |---|---|
 | `CreateWebhook`, `Webhooks`, `Webhook`, `UpdateWebhook`, `DeleteWebhook` | Manage the URLs told what becomes of emails. |
 | `TestWebhook` | Send an endpoint a signed `webhook.test` and say how it answered. |
+| `RotateWebhookSecret` | Give an endpoint a new signing secret; the old one still signs for a day, unless the server is set otherwise. |
+| `ResumeWebhook` | End an endpoint's pause, and have what it is owed sent. |
 | `Deliveries`, `AllDeliveries`, `RetryDelivery` | What an endpoint was sent and how each went; try one again now. |
 | `Suppressions`, `AllSuppressions` | The addresses not sent to, a page at a time or all of them. |
 | `Suppress`, `Lift`, `LiftAll` | Block an address for a sending domain, or let it be sent to again. |
-| `Captured` | The emails a development server (capture driver) kept instead of sending. |
+| `Captured` | The emails a development server (capture driver) kept instead of sending; `ErrNotCapturing` from a server that delivers for real. |
 
 In a `WebhookChange` a nil field is left as it is, and a field that is set
 is changed to exactly that: `Enabled` pointing at `false` disables the
 endpoint, `Events` pointing at an empty list makes it hear about every type.
+
+An endpoint that fails every try for days is paused by the server:
+`w.PausedAt` is set, nothing is sent to it, and it is still owed everything
+that happens. `admin.ResumeWebhook(ctx, w.ID)` resumes it, and what it is
+owed is sent then; a `WebhookChange` never does. `w.FailingSince` says
+since when every try has failed.
 
 ## The server itself
 
