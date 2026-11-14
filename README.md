@@ -120,8 +120,10 @@ answer an `*Error` named `ErrNotScheduled` once the email is being sent,
 was sent or was cancelled. The server keeps what a waiting email says,
 and its files, until it is sent or cancelled. An address suppressed by
 the time the email goes is left out; with nobody left in `To` or `Cc`,
-the email is cancelled and `Message.Reason` says `"suppressed"`. The
-emails of a `Batch` may each have a `ScheduledAt`.
+the email is cancelled and `Message.Reason` says `"suppressed"`.
+Revoking an API key cancels the emails it asked for that still wait. The
+emails of a `Batch` may each have a `ScheduledAt`. An `IdempotencyKey` is
+remembered for a day from the asking, not until the email goes.
 
 ## When a send fails
 

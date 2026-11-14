@@ -157,8 +157,9 @@ type Message struct {
 	// ScheduledAt is when an email that waits will be sent, or would
 	// have been, had it not been cancelled; nil for one that was sent.
 	// Reason says why it was cancelled when nobody asked: "suppressed"
-	// (nobody it named in To or Cc could be sent to any more) or
-	// "key_revoked".
+	// (nobody it named in To or Cc could be sent to any more),
+	// "key_revoked" (its API key was revoked while it waited) or
+	// "failed" (the server could not send it).
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	Reason      string     `json:"reason,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
