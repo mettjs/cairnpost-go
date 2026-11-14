@@ -12,7 +12,7 @@ Every change a user of this client can notice is written here. The format is
   repeated send one email, and read what became of it.
 - Several addresses: `Email.To`, `Cc` and `Bcc` are lists. `Send` answers a
   `Sent` with the email's `ID` and, under `Suppressed`, the addresses it
-  was not sent to; `Message.Recipients` says what became of the email at
+  was not sent to, which `Message.Suppressed` says later; `Message.Recipients` says what became of the email at
   each address, and each `MessageEvent` names its address in `To`.
 - `Error`, `TransportError`, `MayHaveSent`, `IsNotFound` and
   `IsWrongAddress`: what the server refused, whether trying again is right,

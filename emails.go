@@ -37,8 +37,8 @@ type Sent struct {
 	ID string
 	// Suppressed are the addresses it was not sent to, because they are
 	// on the sending domain's suppression list. Empty when it went to
-	// all. An email whose every address is suppressed is an error
-	// instead (ErrRecipientSuppress).
+	// all. An email with nobody left in To or Cc is an error instead
+	// (ErrRecipientSuppress): a Bcc alone is not sent.
 	Suppressed []string
 }
 
@@ -104,8 +104,11 @@ type Message struct {
 	To         string      `json:"to"`
 	State      string      `json:"state"`
 	Recipients []Recipient `json:"recipients"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+	// Suppressed are the addresses it was asked to go to and did not,
+	// being on the suppression list when it was sent.
+	Suppressed []string  `json:"suppressed,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 	// Events are what happened to it after it was sent, oldest first.
 	Events []MessageEvent `json:"events"`
 	// Content is what the email said: nil unless the server keeps content,

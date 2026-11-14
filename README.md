@@ -44,8 +44,9 @@ sent, err := client.Send(ctx, cairnpost.Email{
 An email may name several addresses in `To`, `Cc` and `Bcc` (50 in all,
 unless the server is set otherwise). It is still one email with one id.
 An address on the sending domain's suppression list is left out and the
-email goes to the others: `sent.Suppressed` names who was left out. Only
-when every address is suppressed is the send an error.
+email goes to the others: `sent.Suppressed` names who was left out, as
+`Message.Suppressed` does when the email is read later. The send is an
+error when nobody in `To` or `Cc` is left: a `Bcc` alone is not sent.
 
 **Use an `IdempotencyKey` for anything you may retry.** The same key with
 the same content, sent again, is the same email: the retry answers the
@@ -64,7 +65,7 @@ case err == nil:
 	// Sent. Keep sent.ID.
 case errors.As(err, &problem) && problem.Name == cairnpost.ErrRecipientSuppress:
 	// The address bounced for good, complained, or was blocked by hand
-	// (every address, if the email named several).
+	// (everyone in To and Cc, if the email named several).
 	// Nothing was sent now, and nothing will be: stop sending to it, and
 	// do not retry. If problem.EmailID is set, an earlier try under the
 	// same key got no answer and may have gone: Get(problem.EmailID)
@@ -125,7 +126,8 @@ for _, e := range m.Events {
 ```
 
 `m.To` and `m.State` are the first address and what became of the email
-there; for an email to several, read `m.Recipients`.
+there; for an email to several, read `m.Recipients`: `failed` at one
+address does not say the email went to nobody.
 
 A send key sees the emails it sent; an admin key sees any, or its
 sending domain's if it is bound to one.

@@ -154,6 +154,7 @@ func TestSendingAgainstARealServer(t *testing.T) {
 		t.Fatalf("%+v %v", several, err)
 	}
 	if m, err := send.Get(ctx, several.ID); err != nil || len(m.Recipients) != 3 || m.To != "ana@example.org" ||
+		len(m.Suppressed) != 1 || m.Suppressed[0] != gone ||
 		m.Recipients[1].Kind != KindCc || m.Recipients[2].Kind != KindBcc {
 		t.Fatalf("%+v %v", m, err)
 	}
