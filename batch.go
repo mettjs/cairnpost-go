@@ -53,8 +53,9 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 	}
 	var out struct {
 		Data []struct {
-			ID         string   `json:"id"`
-			Suppressed []string `json:"suppressed"`
+			ID         string    `json:"id"`
+			Suppressed []string  `json:"suppressed"`
+			At         time.Time `json:"scheduled_at"`
 			Error      *struct {
 				Status  int    `json:"statusCode"`
 				Name    string `json:"name"`
@@ -83,8 +84,8 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 				problem.RetryAfter = time.Duration(max(d.Error.Wait, 0)) * time.Second
 			}
 			results[i].Err = problem
-		case d.Error == nil && d.ID != "":
-			results[i].Sent = &Sent{ID: d.ID, Suppressed: d.Suppressed}
+		case d.Error == nil && d.ID != "" && d.At.IsZero() == b.Emails[i].ScheduledAt.IsZero():
+			results[i].Sent = &Sent{ID: d.ID, Suppressed: d.Suppressed, ScheduledAt: d.At}
 		default:
 			return nil, &TransportError{cause: errNotCairnPost}
 		}

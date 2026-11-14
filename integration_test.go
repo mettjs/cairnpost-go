@@ -87,6 +87,30 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if _, err := send.SendBatch(ctx, batch); named(err) != ErrValidation || MayHaveSent(err) {
 		t.Fatalf("a batch with an email that cannot go: %v", err)
 	}
+	// An email asked for later waits, is moved and is cancelled.
+	later := Email{From: email.From, To: []string{"dee@example.org"}, Subject: "Later " + run, Text: "Body", ScheduledAt: time.Now().Add(time.Hour)}
+	waits, err := send.Send(ctx, later)
+	if err != nil || waits.ScheduledAt.IsZero() {
+		t.Fatalf("asked for later: %+v %v", waits, err)
+	}
+	if m, err := send.Get(ctx, waits.ID); err != nil || m.State != StateScheduled || m.ScheduledAt == nil {
+		t.Fatalf("while it waits: %+v %v", m, err)
+	}
+	if err := send.Reschedule(ctx, waits.ID, time.Now().Add(2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := send.Cancel(ctx, waits.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := send.Cancel(ctx, waits.ID); named(err) != ErrNotScheduled {
+		t.Fatalf("cancelled twice: %v", err)
+	}
+	if m, err := send.Get(ctx, waits.ID); err != nil || m.State != StateCancelled {
+		t.Fatalf("once cancelled: %+v %v", m, err)
+	}
+	if _, err := send.Send(ctx, Email{From: email.From, To: []string{"dee@example.org"}, Subject: "s", Text: "t", ScheduledAt: time.Now().Add(-time.Hour)}); named(err) != ErrValidation {
+		t.Fatalf("asked for in the past: %v", err)
+	}
 	held, err := admin.Captured(ctx)
 	found := false
 	for _, c := range held {
