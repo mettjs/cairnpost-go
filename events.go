@@ -9,6 +9,12 @@ const (
 	EventBounced        = "email.bounced"
 	EventComplained     = "email.complained"
 	EventFailed         = "email.failed"
+	// EventAddressSuppressed tells of an address put on the suppression
+	// list because of a bounce or a complaint about an email the server
+	// has no record of. It is about no email: its Email is nil and its
+	// Suppression says which address. An email on record says the same
+	// in its own webhook (EventEmail.Suppressed).
+	EventAddressSuppressed = "address.suppressed"
 	// EventTest is sent when an endpoint is tried out. It is about no
 	// email: its Email is nil.
 	EventTest = "webhook.test"
@@ -39,8 +45,23 @@ type Event struct {
 	Type string `json:"type"`
 	// At is when the event happened.
 	At time.Time `json:"created_at"`
-	// Email is the email the event is about; nil for webhook.test.
+	// Email is the email the event is about; nil for webhook.test and
+	// address.suppressed.
 	Email *EventEmail `json:"email,omitempty"`
+	// Suppression is set for address.suppressed.
+	Suppression *EventSuppression `json:"suppression,omitempty"`
+}
+
+// EventSuppression is the address an address.suppressed webhook is
+// about: the server will refuse to send to it from that sending domain
+// until the suppression is lifted.
+type EventSuppression struct {
+	Domain  string `json:"domain"`
+	Address string `json:"address"`
+	// Reason is one of the Reason constants, never empty: ReasonBounce
+	// (the address refused an email for good) or ReasonComplaint (its
+	// owner marked one as spam).
+	Reason string `json:"reason"`
 }
 
 // EventEmail is the email a webhook is about. Never its subject or body.

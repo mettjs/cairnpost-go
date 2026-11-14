@@ -155,3 +155,32 @@ func TestAnEventKeepsItsIDAndEmailAsJSON(t *testing.T) {
 		t.Fatalf("%s -> %+v %v", raw, back, err)
 	}
 }
+
+// A webhook that tells of a suppression on its own names the address and
+// no email; one that names no address, or no reason, is refused. While a secret is being
+// changed a webhook carries two signatures, and either secret's verifier
+// takes it.
+func TestASuppressionToldOnItsOwnIsRead(t *testing.T) {
+	v := verifier(t)
+	body := `{"type":"address.suppressed","created_at":"2030-01-01T00:00:00Z","data":{"domain":"example.com","address":"ana@example.org","reason":"bounce"}}`
+	e, err := v.Verify(headers("webhook-", "dlv-1", at, signature(key, "dlv-1", at, body)), []byte(body))
+	if err != nil || e.Type != EventAddressSuppressed || e.Email != nil || e.Suppression == nil ||
+		*e.Suppression != (EventSuppression{Domain: "example.com", Address: "ana@example.org", Reason: ReasonBounce}) {
+		t.Fatalf("%+v %v", e, err)
+	}
+	for _, without := range []string{
+		`{"type":"address.suppressed","created_at":"2030-01-01T00:00:00Z","data":{}}`,
+		`{"type":"address.suppressed","created_at":"2030-01-01T00:00:00Z","data":{"domain":"example.com"}}`,
+		`{"type":"address.suppressed","created_at":"2030-01-01T00:00:00Z","data":{"domain":"example.com","address":"ana@example.org"}}`,
+	} {
+		if _, err := v.Verify(headers("webhook-", "dlv-2", at, signature(key, "dlv-2", at, without)), []byte(without)); err != ErrPayload {
+			t.Errorf("a suppression that names no address or no reason: %v", err)
+		}
+	}
+	other := signature([]byte("the secret before the change"), "dlv-1", at, body)
+	for _, both := range []string{other + " " + signature(key, "dlv-1", at, body), signature(key, "dlv-1", at, body) + " " + other} {
+		if _, err := v.Verify(headers("svix-", "dlv-1", at, both), []byte(body)); err != nil {
+			t.Errorf("two signatures, one of them ours: %v", err)
+		}
+	}
+}

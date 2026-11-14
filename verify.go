@@ -19,13 +19,13 @@ const DefaultTolerance = 5 * time.Minute
 var (
 	// ErrSecret: the signing secret is not one CairnPost gives, or the
 	// Verifier was not made by NewVerifier.
-	ErrSecret = errors.New("cairnpost: the signing secret must be the whsec_ value the endpoint was created with")
+	ErrSecret = errors.New("cairnpost: the signing secret must be the whsec_ value the server gave for the endpoint")
 	// ErrUnsigned: the request lacks the webhook's id, timestamp or
 	// signature headers.
 	ErrUnsigned = errors.New("cairnpost: the webhook's signature headers are missing")
 	// ErrSignature: no signature matches. The request is not from
-	// CairnPost, was changed on the way, or was signed for another
-	// endpoint.
+	// CairnPost, was changed on the way, was signed for another endpoint,
+	// or the endpoint's secret was changed and this one no longer signs.
 	ErrSignature = errors.New("cairnpost: the webhook's signature does not match")
 	// ErrStale: the timestamp is too far from now. A webhook caught on
 	// the way and replayed later is refused by this.
@@ -47,7 +47,8 @@ type Verifier struct {
 }
 
 // NewVerifier returns a verifier for an endpoint's signing secret: the
-// "whsec_..." value CreateWebhook answered, which is said only once.
+// "whsec_..." value CreateWebhook answered or, once the secret was
+// changed, the one RotateWebhookSecret did. Each is said only once.
 func NewVerifier(secret string) (*Verifier, error) {
 	encoded, ok := strings.CutPrefix(strings.TrimSpace(secret), "whsec_")
 	key, err := base64.StdEncoding.DecodeString(encoded)
@@ -62,8 +63,8 @@ func NewVerifier(secret string) (*Verifier, error) {
 // error means the request must not be trusted; answer it 400 or 401.
 //
 // In the Event answered, Email is set for every type that starts with
-// "email.", and Email.Bounce for email.bounced; Email is nil for
-// webhook.test.
+// "email.", and Email.Bounce for email.bounced; Suppression is set for
+// address.suppressed; both are nil for webhook.test.
 //
 // CairnPost signs as Standard Webhooks and Svix do, and sends the headers
 // under both names; either set is accepted.
@@ -131,6 +132,15 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	}
 	if e.Type == EventBounced && e.Email.Bounce == nil {
 		return nil, ErrPayload
+	}
+	if e.Type == EventAddressSuppressed {
+		// It must say which address and why, as an email's event must
+		// say which email.
+		var s EventSuppression
+		if json.Unmarshal(wire.Data, &s) != nil || s.Domain == "" || s.Address == "" || s.Reason == "" {
+			return nil, ErrPayload
+		}
+		e.Suppression = &s
 	}
 	return e, nil
 }
