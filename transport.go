@@ -50,10 +50,36 @@ func MayHaveSent(err error) bool {
 }
 
 // IsNotFound says that what was asked for is not there: no such email,
-// endpoint, delivery or suppression, or not one this key may see. A base
-// URL with a wrong path answers the same for everything; Health tells the
-// two apart.
+// endpoint, delivery or suppression, or not one this key may see. It is
+// CairnPost's own word for it: a path the server does not have, or a 404
+// from something else at that address, is not this. IsWrongAddress says
+// those.
+//
+// It needs the server's own answer to arrive. Behind a proxy that puts
+// its own page in place of every 404, no record is ever said to be
+// missing and every such answer reads as a wrong address: have the proxy
+// pass the server's error answers through.
 func IsNotFound(err error) bool {
 	var problem *Error
-	return errors.As(err, &problem) && problem.Status == http.StatusNotFound
+	return errors.As(err, &problem) && problem.Status == http.StatusNotFound && problem.Name == ErrNotFound
+}
+
+// IsWrongAddress says that the request did not reach a route of
+// CairnPost's: the server has nothing at that path or does not take that
+// method there, or something else answered in its place with a 404, a
+// 405 or a redirect. The base URL given to New is most likely wrong;
+// nothing was sent, and no record is known to be missing.
+func IsWrongAddress(err error) bool {
+	var problem *Error
+	if !errors.As(err, &problem) {
+		return false
+	}
+	switch problem.Name {
+	case ErrRouteNotFound, ErrMethodNotAllowed:
+		return true
+	case "":
+		return problem.Status == http.StatusNotFound || problem.Status == http.StatusMethodNotAllowed ||
+			(problem.Status >= 300 && problem.Status < 400)
+	}
+	return false
 }

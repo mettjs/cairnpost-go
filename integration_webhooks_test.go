@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -89,5 +90,76 @@ func TestWebhooksAgainstARealServer(t *testing.T) {
 	}
 	if _, err := admin.Webhook(ctx, w.ID); !IsNotFound(err) {
 		t.Fatalf("after it was removed: %v", err)
+	}
+}
+
+// A changed secret verifies beside the one before it: the server signs
+// with both, and a Verifier made with either takes the same webhook. An
+// endpoint that is not paused is resumed to no effect, and a base URL
+// that is wrong is told apart from a record that is missing.
+func TestRotationResumeAndAWrongAddressAgainstARealServer(t *testing.T) {
+	_, admin := live(t)
+	type arrival struct {
+		header http.Header
+		body   []byte
+	}
+	got := make(chan arrival, 4)
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		got <- arrival{r.Header, body}
+	}))
+	defer receiver.Close()
+	w, err := admin.CreateWebhook(ctx, NewWebhook{URL: receiver.URL + "/hook", Description: "the client's rotation test",
+		Events: []string{EventAddressSuppressed}})
+	if err != nil || len(w.Events) != 1 || w.Events[0] != EventAddressSuppressed {
+		t.Fatalf("%+v %v (the server needs CAIRNPOST_WEBHOOK_ALLOW_PRIVATE=true)", w, err)
+	}
+	defer admin.DeleteWebhook(ctx, w.ID)
+	changed, err := admin.RotateWebhookSecret(ctx, w.ID)
+	if err != nil || !strings.HasPrefix(changed.Secret, "whsec_") || changed.Secret == w.Secret ||
+		changed.PreviousSecretUntil == nil || !changed.PreviousSecretUntil.After(time.Now()) {
+		t.Fatalf("%+v %v", changed, err)
+	}
+	if again, err := admin.Webhook(ctx, w.ID); err != nil || again.Secret != "" || again.PreviousSecretUntil == nil {
+		t.Fatalf("a later read: %+v %v", again, err)
+	}
+	if res, err := admin.TestWebhook(ctx, w.ID); err != nil || !res.Delivered {
+		t.Fatalf("%+v %v", res, err)
+	}
+	select {
+	case a := <-got:
+		for which, secret := range map[string]string{"the new secret": changed.Secret, "the old secret": w.Secret} {
+			v, err := NewVerifier(secret)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if e, err := v.Verify(a.header, a.body); err != nil || e.Type != EventTest {
+				t.Errorf("%s does not verify the webhook: %v", which, err)
+			}
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the test webhook did not arrive")
+	}
+	if resumed, err := admin.ResumeWebhook(ctx, w.ID); err != nil || resumed.PausedAt != nil || resumed.ID != w.ID {
+		t.Fatalf("resuming one that is not paused: %+v %v", resumed, err)
+	}
+
+	// The server's own word for each: a record that is not there, and a
+	// path that is not.
+	if _, err := admin.Get(ctx, "01900000-0000-7000-8000-000000000000"); !IsNotFound(err) || IsWrongAddress(err) {
+		t.Fatalf("an email that is not there: %v", err)
+	}
+	astray, err := New(strings.TrimRight(os.Getenv("CAIRNPOST_URL"), "/")+"/not-the-server", os.Getenv("CAIRNPOST_ADMIN_KEY"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := astray.Get(ctx, "01900000-0000-7000-8000-000000000000"); IsNotFound(err) || !IsWrongAddress(err) || named(err) != ErrRouteNotFound {
+		t.Fatalf("a base URL with a wrong path: %v", err)
+	}
+	if _, err := astray.Health(ctx); !IsWrongAddress(err) {
+		t.Fatalf("health at a wrong path: %v", err)
+	}
+	if _, err := astray.Captured(ctx); !IsWrongAddress(err) || errors.Is(err, ErrNotCapturing) {
+		t.Fatalf("captured emails at a wrong path: %v", err)
 	}
 }

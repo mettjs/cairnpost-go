@@ -63,7 +63,7 @@ func ExampleError() {
 }
 
 func ExampleVerifier_Verify() {
-	verifier, err := cairnpost.NewVerifier("whsec_...") // from CreateWebhook
+	verifier, err := cairnpost.NewVerifier("whsec_...") // from CreateWebhook, or RotateWebhookSecret since
 	if err != nil {
 		log.Fatal(err)
 	}

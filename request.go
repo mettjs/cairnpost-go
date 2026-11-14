@@ -101,8 +101,13 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 	if int64(len(raw)) > c.most {
 		return &TransportError{cause: errTooLarge}
 	}
-	if !k.plain && (res.StatusCode < 200 || res.StatusCode > 299) {
-		return problemOf(res, raw)
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		// A plain call's 503 is an answer to read (the server is up and
+		// says what is not); anything else it is refused with is an
+		// error like any other, a path that is not there above all.
+		if problem := problemOf(res, raw); !k.plain || problem.Name != "" || res.StatusCode != http.StatusServiceUnavailable {
+			return problem
+		}
 	}
 	if out == nil {
 		return nil
