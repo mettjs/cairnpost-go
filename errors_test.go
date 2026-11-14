@@ -43,7 +43,7 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 			w.WriteHeader(want.status)
 			io.WriteString(w, want.body)
 		})
-		_, err := c.Send(ctx, Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t"})
+		_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"})
 		var problem *Error
 		if !errors.As(err, &problem) {
 			t.Fatalf("%d: %v", want.status, err)
@@ -59,7 +59,7 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 // An error never repeats what the email said or the key that sent it,
 // whatever went wrong and whatever the server answered.
 func TestNoErrorHoldsTheEmailsWordsOrTheKey(t *testing.T) {
-	email := Email{From: "NAMEMARK <app@example.com>", To: "ana@example.org", Subject: "SUBJECTMARK",
+	email := Email{From: "NAMEMARK <app@example.com>", To: []string{"ana@example.org"}, Subject: "SUBJECTMARK",
 		Text: "TEXTMARK", HTML: "<p>HTMLMARK</p>", Headers: map[string]string{"X-Trace": "HEADERMARK"}}
 	marks := []string{"NAMEMARK", "SUBJECTMARK", "TEXTMARK", "HTMLMARK", "HEADERMARK", "KEYMARK"}
 	check := func(why string, err error) {
@@ -122,7 +122,7 @@ func TestRetryAfterAsADateIsRead(t *testing.T) {
 		w.Header().Set("Retry-After", time.Now().Add(90*time.Second).UTC().Format(http.TimeFormat))
 		w.WriteHeader(503)
 	})
-	_, err := c.Send(ctx, Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t"})
+	_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"})
 	var problem *Error
 	if !errors.As(err, &problem) || problem.RetryAfter < 80*time.Second || problem.RetryAfter > 91*time.Second {
 		t.Fatalf("%+v", problem)

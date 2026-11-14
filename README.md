@@ -29,17 +29,24 @@ if err != nil {
 	log.Fatal(err)
 }
 
-id, err := client.Send(ctx, cairnpost.Email{
+sent, err := client.Send(ctx, cairnpost.Email{
 	From:           "Example <hello@example.com>",
-	To:             "ana@example.org",
+	To:             []string{"ana@example.org"},
 	Subject:        "Welcome",
 	Text:           "Glad you are here.",
 	IdempotencyKey: "welcome-user-42",
 })
 ```
 
-An email goes to one recipient. `HTML`, `Text` or both; `ReplyTo` and
-`Headers` are optional.
+`sent.ID` is the email's id. `HTML`, `Text` or both; `Cc`, `Bcc`,
+`ReplyTo` and `Headers` are optional.
+
+An email may name several addresses in `To`, `Cc` and `Bcc` (50 in all,
+unless the server is set otherwise). It is still one email with one id.
+An address on the sending domain's suppression list is left out and the
+email goes to the others: `sent.Suppressed` names who was left out, as
+`Message.Suppressed` does when the email is read later. The send is an
+error when nobody in `To` or `Cc` is left: a `Bcc` alone is not sent.
 
 **Use an `IdempotencyKey` for anything you may retry.** The same key with
 the same content, sent again, is the same email: the retry answers the
@@ -50,14 +57,15 @@ first one's id and sends nothing.
 The client never retries by itself. The error says what happened:
 
 ```go
-id, err := client.Send(ctx, email)
+sent, err := client.Send(ctx, email)
 
 var problem *cairnpost.Error
 switch {
 case err == nil:
-	// Sent. Keep the id.
+	// Sent. Keep sent.ID.
 case errors.As(err, &problem) && problem.Name == cairnpost.ErrRecipientSuppress:
-	// The address bounced for good, complained, or was blocked by hand.
+	// The address bounced for good, complained, or was blocked by hand
+	// (everyone in To and Cc, if the email named several).
 	// Nothing was sent now, and nothing will be: stop sending to it, and
 	// do not retry. If problem.EmailID is set, an earlier try under the
 	// same key got no answer and may have gone: Get(problem.EmailID)
@@ -109,10 +117,17 @@ client that gives up first cannot know whether its email went.
 ```go
 m, err := client.Get(ctx, id)
 fmt.Println(m.State) // sending, sent, deferred, delivered, bounced, complained, failed, unknown
+for _, r := range m.Recipients {
+	fmt.Println(r.Address, r.Kind, r.State) // each address has its own outcome
+}
 for _, e := range m.Events {
-	fmt.Println(e.Type, e.At, e.Code, e.Reason)
+	fmt.Println(e.To, e.Type, e.At, e.Code, e.Reason)
 }
 ```
+
+`m.To` and `m.State` are the first address and what became of the email
+there; for an email to several, read `m.Recipients`: `failed` at one
+address does not say the email went to nobody.
 
 A send key sees the emails it sent; an admin key sees any, or its
 sending domain's if it is bound to one.
@@ -168,6 +183,8 @@ http.HandleFunc("/webhooks/cairnpost", func(w http.ResponseWriter, r *http.Reque
   `event.Email.Bounce` for `email.bounced`; a webhook that lacks them is
   refused (`ErrPayload`). `event.Email` is nil for `webhook.test`, the
   webhook sent to try an endpoint out.
+- `event.Email.To` holds the one address the event is about, also when
+  the email went to several; `event.Email.ID` is the email's one id.
 - `address.suppressed` (`cairnpost.EventAddressSuppressed`) tells of an
   address suppressed because of a bounce or a complaint about an email
   the server has no record of. It names no email: `event.Suppression`

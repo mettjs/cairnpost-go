@@ -8,10 +8,10 @@ import (
 
 func TestSendSaysOnlyWhatTheServerNames(t *testing.T) {
 	s, c := serve(t, 200, `{"id":"msg-1"}`)
-	id, err := c.Send(ctx, Email{From: "App <app@example.com>", To: "ana@example.org", Subject: "Hi <there>",
+	id, err := c.Send(ctx, Email{From: "App <app@example.com>", To: []string{"ana@example.org"}, Subject: "Hi <there>",
 		Text: "Body", IdempotencyKey: "welcome-42"})
-	if err != nil || id != "msg-1" {
-		t.Fatalf("%q %v", id, err)
+	if err != nil || id.ID != "msg-1" || len(id.Suppressed) != 0 {
+		t.Fatalf("%+v %v", id, err)
 	}
 	got := s.seen[0]
 	if got.method != "POST" || got.path != "/emails" || got.auth != "Bearer cp_test_KEYMARK" || got.idem != "welcome-42" ||
@@ -26,7 +26,7 @@ func TestSendSaysOnlyWhatTheServerNames(t *testing.T) {
 		t.Fatalf("%s %v", got.body, err)
 	}
 	// Without a key, no header.
-	if _, err := c.Send(ctx, Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t"}); err != nil || s.seen[1].idem != "" {
+	if _, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"}); err != nil || s.seen[1].idem != "" {
 		t.Fatalf("%v %+v", err, s.seen[1])
 	}
 }
@@ -59,8 +59,8 @@ func TestAnAnswerThatIsNotCairnPostsIsNotASend(t *testing.T) {
 	for _, body := range []string{`{}`, `null`, `{"ok":true}`, ``} {
 		for _, status := range []int{200, 204} {
 			_, c := serve(t, status, body)
-			if id, err := c.Send(ctx, Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t"}); err == nil || id != "" {
-				t.Errorf("%d %q was taken as a send: %q", status, body, id)
+			if id, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"}); err == nil || id != nil {
+				t.Errorf("%d %q was taken as a send: %+v", status, body, id)
 			}
 			if m, err := c.Get(ctx, "m"); err == nil {
 				t.Errorf("%d %q was taken as an email: %+v", status, body, m)
@@ -77,9 +77,36 @@ func TestAnAnswerThatIsNotCairnPostsIsNotASend(t *testing.T) {
 func TestAnIdempotencyKeyAHeaderCannotCarryIsRefused(t *testing.T) {
 	s, c := serve(t, 200, `{"id":"m"}`)
 	for _, key := range []string{"  ", " padded", "two\nlines", "nul\x00"} {
-		_, err := c.Send(ctx, Email{From: "a@example.com", To: "b@example.org", Subject: "s", Text: "t", IdempotencyKey: key})
+		_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t", IdempotencyKey: key})
 		if err == nil || MayHaveSent(err) || len(s.seen) != 0 {
 			t.Errorf("%q: %v, %d requests", key, err, len(s.seen))
 		}
+	}
+}
+
+func TestAnEmailToSeveralNamesEachAndSaysWhoWasLeftOut(t *testing.T) {
+	s, c := serve(t, 200, `{"id":"msg-2","suppressed":["gone@example.org"]}`)
+	sent, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"ana@example.org", "gone@example.org"},
+		Cc: []string{"bo@example.org"}, Bcc: []string{"cy@example.org"}, Subject: "s", Text: "t"})
+	if err != nil || sent.ID != "msg-2" || len(sent.Suppressed) != 1 || sent.Suppressed[0] != "gone@example.org" {
+		t.Fatalf("%+v %v", sent, err)
+	}
+	var body struct {
+		To, Cc, Bcc []string
+	}
+	if err := json.Unmarshal([]byte(s.seen[0].body), &body); err != nil || len(body.To) != 2 ||
+		len(body.Cc) != 1 || body.Cc[0] != "bo@example.org" || len(body.Bcc) != 1 || body.Bcc[0] != "cy@example.org" {
+		t.Fatalf("%s %v", s.seen[0].body, err)
+	}
+}
+
+func TestGetReadsEachAddressOfAnEmail(t *testing.T) {
+	_, c := serve(t, 200, `{"id":"m","from":"a@example.com","to":"ana@example.org","state":"delivered",
+		"recipients":[{"address":"ana@example.org","kind":"to","state":"delivered"},{"address":"bo@example.org","kind":"bcc","state":"bounced"}],
+		"events":[{"type":"bounced","to":"bo@example.org","permanent":true}]}`)
+	m, err := c.Get(ctx, "m")
+	if err != nil || len(m.Recipients) != 2 || m.Recipients[1].Kind != KindBcc || m.Recipients[1].State != StateBounced ||
+		len(m.Events) != 1 || m.Events[0].To != "bo@example.org" {
+		t.Fatalf("%+v %v", m, err)
 	}
 }

@@ -51,16 +51,17 @@ func TestSendingAgainstARealServer(t *testing.T) {
 		t.Fatalf("%+v %v", l, err)
 	}
 	run := fmt.Sprintf("run-%d", time.Now().UnixNano())
-	email := Email{From: "App <app@" + run + ".example.com>", To: "ana@example.org", Subject: "Hello " + run,
+	email := Email{From: "App <app@" + run + ".example.com>", To: []string{"ana@example.org"}, Subject: "Hello " + run,
 		Text: "Body", HTML: "<p>Body & more</p>", ReplyTo: "help@example.com", Headers: map[string]string{"X-Run": run},
 		IdempotencyKey: run}
-	id, err := send.Send(ctx, email)
-	if err != nil || id == "" {
-		t.Fatalf("%q %v", id, err)
+	first, err := send.Send(ctx, email)
+	if err != nil {
+		t.Fatal(err)
 	}
+	id := first.ID
 	// The same request again is the same email; another under its key is refused.
-	if again, err := send.Send(ctx, email); err != nil || again != id {
-		t.Fatalf("a repeat answered %q %v, want %q", again, err, id)
+	if again, err := send.Send(ctx, email); err != nil || again.ID != id {
+		t.Fatalf("a repeat answered %+v %v, want %q", again, err, id)
 	}
 	other := email
 	other.Subject = "Another"
@@ -82,13 +83,13 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	// Whatever the server refuses, the error repeats nothing the email
 	// said: not its subject, its bodies, a header's value or the sender's
 	// name.
-	worded := Email{From: "NAMEMARKQ <app@" + run + ".example.com>", To: "ana@example.org", Subject: "SUBJECTMARKQ",
+	worded := Email{From: "NAMEMARKQ <app@" + run + ".example.com>", To: []string{"ana@example.org"}, Subject: "SUBJECTMARKQ",
 		Text: "TEXTMARKQ", HTML: "<p>HTMLMARKQ</p>", Headers: map[string]string{"X-Trace": "HEADERMARKQ"}, IdempotencyKey: run + "-worded"}
 	if _, err := send.Send(ctx, worded); err != nil {
 		t.Fatal(err)
 	}
 	refused := map[string]func(*Email){
-		ErrValidation + " (the recipient)": func(e *Email) { e.To = "not an address" },
+		ErrValidation + " (the recipient)": func(e *Email) { e.To = []string{"not an address"} },
 		ErrValidation + " (a header)":      func(e *Email) { e.Headers = map[string]string{"Bad Header": "HEADERMARKQ"} },
 		ErrValidation + " (no body)":       func(e *Email) { e.Text, e.HTML = "", "" },
 		ErrIdempotentMismatch:              func(e *Email) { e.Subject = "SUBJECTMARKQ again" },
@@ -108,7 +109,7 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	}
 	// What the server refuses comes back named.
 	bad := email
-	bad.To, bad.IdempotencyKey = "not an address", ""
+	bad.To, bad.IdempotencyKey = []string{"not an address"}, ""
 	if _, err := send.Send(ctx, bad); named(err) != ErrValidation {
 		t.Fatalf("%v", err)
 	}
@@ -131,7 +132,7 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if added, err := admin.Suppress(ctx, domain, gone, ""); err != nil || added {
 		t.Fatalf("a second time: %v %v", added, err)
 	}
-	blocked := Email{From: "app@" + domain, To: gone, Subject: "s", Text: "t"}
+	blocked := Email{From: "app@" + domain, To: []string{gone}, Subject: "s", Text: "t"}
 	if _, err := send.Send(ctx, blocked); named(err) != ErrRecipientSuppress {
 		t.Fatalf("%v", err)
 	}
@@ -144,6 +145,18 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	}
 	if len(listed) != 1 || listed[0].Address != gone || listed[0].Reason != ReasonManual || listed[0].Note != "by the test" {
 		t.Fatalf("%+v", listed)
+	}
+	// Among several, a suppressed address is left out and named; the email
+	// is one, with an outcome for each address it went to.
+	several, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"ana@example.org", gone},
+		Cc: []string{"bo@example.org"}, Bcc: []string{"cy@example.org"}, Subject: "s", Text: "t"})
+	if err != nil || len(several.Suppressed) != 1 || several.Suppressed[0] != gone {
+		t.Fatalf("%+v %v", several, err)
+	}
+	if m, err := send.Get(ctx, several.ID); err != nil || len(m.Recipients) != 3 || m.To != "ana@example.org" ||
+		len(m.Suppressed) != 1 || m.Suppressed[0] != gone ||
+		m.Recipients[1].Kind != KindCc || m.Recipients[2].Kind != KindBcc {
+		t.Fatalf("%+v %v", m, err)
 	}
 	if err := admin.Lift(ctx, domain, gone); err != nil {
 		t.Fatal(err)

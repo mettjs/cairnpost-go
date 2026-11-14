@@ -76,7 +76,9 @@ type CapturedEmail struct {
 	At       time.Time         `json:"at"`
 	From     string            `json:"from"`
 	FromName string            `json:"from_name,omitempty"`
-	To       string            `json:"to"`
+	To       []string          `json:"to"`
+	Cc       []string          `json:"cc,omitempty"`
+	Bcc      []string          `json:"bcc,omitempty"`
 	ReplyTo  string            `json:"reply_to,omitempty"`
 	Subject  string            `json:"subject"`
 	HTML     string            `json:"html,omitempty"`
