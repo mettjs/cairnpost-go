@@ -18,8 +18,20 @@ type Webhook struct {
 	Description string    `json:"description,omitempty"`
 	Enabled     bool      `json:"enabled"`
 	CreatedAt   time.Time `json:"created_at"`
+	// FailingSince is set while every try since then has failed.
+	FailingSince *time.Time `json:"failing_since,omitempty"`
+	// PausedAt is set while the endpoint is paused: it failed every try
+	// for longer than the server allows. It is still owed everything that
+	// happens, and nothing is sent to it until ResumeWebhook.
+	PausedAt *time.Time `json:"paused_at,omitempty"`
+	// PreviousSecretUntil is set after RotateWebhookSecret: until then
+	// the server signs with the secret before as well as the new one. It
+	// is nil when no older secret signs: none was changed lately, or the
+	// server is set to end an old secret at once.
+	PreviousSecretUntil *time.Time `json:"previous_secret_until,omitempty"`
 	// Secret is the signing secret, for NewVerifier. It is set only on
-	// the answer to CreateWebhook and is never said again: keep it.
+	// the answers to CreateWebhook and RotateWebhookSecret and is never
+	// said again: keep it.
 	Secret string `json:"secret,omitempty"`
 }
 
@@ -75,7 +87,8 @@ type WebhookChange struct {
 }
 
 // UpdateWebhook changes an endpoint and answers it as it now is. A
-// disabled endpoint is owed nothing new, and what it was owed waits.
+// disabled endpoint is owed nothing new, and what it was owed waits. It
+// does not resume a paused endpoint: ResumeWebhook does.
 // Admin key.
 func (c *Client) UpdateWebhook(ctx context.Context, id string, change WebhookChange) (*Webhook, error) {
 	if change.Events != nil && *change.Events == nil {
@@ -100,6 +113,29 @@ type WebhookTest struct {
 	// Failure is why it was not delivered: "timeout", "refused", "dns",
 	// "tls", "blocked", "status" or "other".
 	Failure string `json:"failure,omitempty"`
+}
+
+// RotateWebhookSecret gives the endpoint a new signing secret and
+// answers the endpoint with it, the only time it is said. Until the
+// PreviousSecretUntil it answers (a day later, unless the server is set
+// otherwise) the server signs each webhook with the old secret as well,
+// so a Verifier made with either accepts it: change the application's
+// secret within that time. A nil PreviousSecretUntil means the old secret
+// has already stopped signing: put the new one in place at once.
+//
+// If the call fails with no answer (a TransportError), the secret may
+// have been changed and its new value lost. Call it again: that gives
+// another new secret, and the one the application holds goes on signing
+// for its own time meanwhile. Admin key.
+func (c *Client) RotateWebhookSecret(ctx context.Context, id string) (*Webhook, error) {
+	return c.endpoint(ctx, call{method: http.MethodPost, path: []string{"webhooks", id, "secret"}})
+}
+
+// ResumeWebhook ends an endpoint's pause and answers the endpoint: what
+// it is owed is sent then, with what was given up while it was failing.
+// One that is not paused is answered as it is. Admin key.
+func (c *Client) ResumeWebhook(ctx context.Context, id string) (*Webhook, error) {
+	return c.endpoint(ctx, call{method: http.MethodPost, path: []string{"webhooks", id, "resume"}})
 }
 
 // TestWebhook sends the endpoint a signed webhook of type webhook.test

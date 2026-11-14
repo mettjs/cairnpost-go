@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // A change says exactly what is set: false and an empty list are sent,
@@ -75,5 +76,47 @@ func TestWebhooksAndDeliveries(t *testing.T) {
 	}
 	if err := c.DeleteWebhook(ctx, "w1"); err != nil || s.seen[6].method != "DELETE" {
 		t.Fatalf("%v", err)
+	}
+}
+
+// A changed secret is said on the answer, with until when the old one
+// still signs; how an endpoint stands is read with it.
+func TestASecretIsRotatedAndAnEndpointSaysHowItStands(t *testing.T) {
+	s, c := serve(t, 200, `{"id":"w1","url":"https://example.com/hook","events":[],"enabled":true,"created_at":"2030-01-01T00:00:00Z",
+		"failing_since":"2030-01-02T00:00:00Z","paused_at":"2030-01-07T00:00:00Z","previous_secret_until":"2030-01-08T00:00:00Z","secret":"whsec_bmV3"}`)
+	w, err := c.RotateWebhookSecret(ctx, "w1")
+	if err != nil || s.seen[0].method != "POST" || s.seen[0].path != "/webhooks/w1/secret" || s.seen[0].body != "" {
+		t.Fatalf("%v %+v", err, s.seen[0])
+	}
+	if w.Secret != "whsec_bmV3" || w.PreviousSecretUntil == nil || !w.PreviousSecretUntil.Equal(time.Date(2030, 1, 8, 0, 0, 0, 0, time.UTC)) ||
+		w.PausedAt == nil || w.FailingSince == nil || !w.Enabled {
+		t.Fatalf("%+v", w)
+	}
+}
+
+// A paused endpoint is resumed by a call of its own.
+func TestAnEndpointIsResumed(t *testing.T) {
+	s, c := serve(t, 200, `{"id":"w1","url":"https://example.com/hook","events":[],"enabled":true,"created_at":"2030-01-01T00:00:00Z"}`)
+	w, err := c.ResumeWebhook(ctx, "w1")
+	if err != nil || s.seen[0].method != "POST" || s.seen[0].path != "/webhooks/w1/resume" || s.seen[0].body != "" ||
+		w.PausedAt != nil || w.FailingSince != nil {
+		t.Fatalf("%+v %v %+v", w, err, s.seen[0])
+	}
+}
+
+// An answer that is not an endpoint is not taken for one: a changed
+// secret that was never said must not read as a success.
+func TestAnAnswerThatIsNoEndpointIsRefused(t *testing.T) {
+	_, c := serve(t, 200, `{}`)
+	if w, err := c.RotateWebhookSecret(ctx, "w1"); err == nil || w != nil {
+		t.Fatalf("a secret: %+v %v", w, err)
+	}
+	if w, err := c.ResumeWebhook(ctx, "w1"); err == nil || w != nil {
+		t.Fatalf("a resume: %+v %v", w, err)
+	}
+	// With the server set to end an old secret at once, none still signs.
+	_, c = serve(t, 200, `{"id":"w1","url":"https://example.com/hook","events":[],"enabled":true,"created_at":"2030-01-01T00:00:00Z","secret":"whsec_bmV3"}`)
+	if w, err := c.RotateWebhookSecret(ctx, "w1"); err != nil || w.PreviousSecretUntil != nil || w.Secret == "" {
+		t.Fatalf("%+v %v", w, err)
 	}
 }

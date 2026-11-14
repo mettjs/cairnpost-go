@@ -17,7 +17,9 @@ const (
 // Delivery is one webhook owed to one endpoint, and how it went.
 type Delivery struct {
 	// ID is also the webhook's id as its receiver sees it (Event.ID).
-	ID      string `json:"id"`
+	ID string `json:"id"`
+	// EmailID is the email the webhook is about; "" for one about no
+	// email (EventAddressSuppressed).
 	EmailID string `json:"email_id"`
 	// Type is the webhook's type (the Event constants).
 	Type string `json:"type"`
