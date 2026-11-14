@@ -72,6 +72,21 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if err != nil || m.ID != id || m.State != StateSent || m.To != "ana@example.org" || m.CreatedAt.IsZero() {
 		t.Fatalf("%+v %v", m, err)
 	}
+	// A batch: each email has its own id, and the batch again is the same.
+	batch := Batch{IdempotencyKey: run + "-batch", Emails: []Email{
+		{From: email.From, To: []string{"ben@example.org"}, Subject: "One " + run, Text: "Body"},
+		{From: email.From, To: []string{"cy@example.org"}, Subject: "Two " + run, Text: "Body"}}}
+	sent, err := send.SendBatch(ctx, batch)
+	if err != nil || len(sent) != 2 || Failed(sent) != 0 || sent[0].Sent.ID == sent[1].Sent.ID {
+		t.Fatalf("the batch: %+v %v", sent, err)
+	}
+	if again, err := send.SendBatch(ctx, batch); err != nil || Failed(again) != 0 || again[1].Sent.ID != sent[1].Sent.ID {
+		t.Fatalf("the batch again: %+v %v", again, err)
+	}
+	batch.Emails[1].To = nil
+	if _, err := send.SendBatch(ctx, batch); named(err) != ErrValidation || MayHaveSent(err) {
+		t.Fatalf("a batch with an email that cannot go: %v", err)
+	}
 	held, err := admin.Captured(ctx)
 	found := false
 	for _, c := range held {

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // headerSafe says a value can be sent as a header as it is: printable,
@@ -47,11 +48,18 @@ type call struct {
 // Any other status is an *Error. A failure to reach the server, or to read
 // its answer, is a *TransportError.
 func (c *Client) do(ctx context.Context, k call, out any) error {
+	_, err := c.doWaiting(ctx, k, out)
+	return err
+}
+
+// doWaiting is do that also answers how long a taken request asks to
+// wait before what it left undone is tried again.
+func (c *Client) doWaiting(ctx context.Context, k call, out any) (time.Duration, error) {
 	u := *c.base
 	u.Path, u.RawPath = c.base.Path, c.base.EscapedPath()
 	for _, seg := range k.path {
 		if seg == "" {
-			return errors.New("cairnpost: an id is required")
+			return 0, errors.New("cairnpost: an id is required")
 		}
 		u.Path += "/" + seg
 		u.RawPath += "/" + url.PathEscape(seg)
@@ -66,7 +74,7 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		enc := json.NewEncoder(&raw)
 		enc.SetEscapeHTML(false)
 		if err := enc.Encode(k.body); err != nil {
-			return fmt.Errorf("cairnpost: encode the request: %w", err)
+			return 0, fmt.Errorf("cairnpost: encode the request: %w", err)
 		}
 		// Handed over as a plain reader, not as a buffer: net/http replays
 		// a request it can rewind when it carries an Idempotency-Key, and
@@ -75,7 +83,7 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 	}
 	req, err := http.NewRequestWithContext(ctx, k.method, u.String(), body)
 	if err != nil {
-		return errors.New("cairnpost: the request could not be built")
+		return 0, errors.New("cairnpost: the request could not be built")
 	}
 	req.ContentLength = size
 	for name, values := range k.header {
@@ -91,30 +99,30 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 	}
 	res, err := c.http.Do(req)
 	if err != nil {
-		return &TransportError{cause: err}
+		return 0, &TransportError{cause: err}
 	}
 	defer res.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(res.Body, c.most+1))
 	if err != nil {
-		return &TransportError{cause: err}
+		return 0, &TransportError{cause: err}
 	}
 	if int64(len(raw)) > c.most {
-		return &TransportError{cause: errTooLarge}
+		return 0, &TransportError{cause: errTooLarge}
 	}
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		// A plain call's 503 is an answer to read (the server is up and
 		// says what is not); anything else it is refused with is an
 		// error like any other, a path that is not there above all.
 		if problem := problemOf(res, raw); !k.plain || problem.Name != "" || res.StatusCode != http.StatusServiceUnavailable {
-			return problem
+			return 0, problem
 		}
 	}
 	if out == nil {
-		return nil
+		return waitOf(res), nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
 		// The answer's text is not quoted: it could hold an email's words.
-		return &TransportError{cause: errNotCairnPost}
+		return 0, &TransportError{cause: errNotCairnPost}
 	}
-	return nil
+	return waitOf(res), nil
 }
