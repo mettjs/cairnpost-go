@@ -20,9 +20,9 @@ const Version = "0.1.0-dev"
 
 // DefaultTimeout is how long a call may take with the client's own HTTP
 // client. It is longer than the server gives its slowest answer (a send
-// that waits for the mail provider): a client that gave up sooner would
-// not know whether its email went.
-const DefaultTimeout = 40 * time.Second
+// with files that arrives slowly and then waits for the mail provider):
+// a client that gave up sooner would not know whether its email went.
+const DefaultTimeout = 75 * time.Second
 
 // DefaultMaxAnswerBytes is how much of an answer is read unless
 // WithMaxAnswerBytes says otherwise. Only a development server's list of

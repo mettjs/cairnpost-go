@@ -127,10 +127,12 @@ The client does not follow redirects, which would turn a send into a
 request with no email in it: give `New` the server's own address. An API
 key is sent without the spaces or newline around it.
 
-The client's own HTTP timeout is 40 seconds, longer than the server waits
-for its mail provider. If you pass your own `http.Client` with
-`WithHTTPClient`, keep its timeout above the server's send timeout: a
-client that gives up first cannot know whether its email went.
+The client's own HTTP timeout is 75 seconds, longer than the server takes
+for its slowest answer: a send with files may take 30 seconds to arrive,
+and then waits for the mail provider. If you pass your own `http.Client`
+with `WithHTTPClient`, keep its timeout above that (a minute, and more
+if the server's send timeout was raised): a client that gives up first
+cannot know whether its email went.
 
 ## What became of an email
 
