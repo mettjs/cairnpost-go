@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/logo-dark.svg">
+    <img src=".github/logo-light.svg" alt="CairnPost" width="330" height="72">
+  </picture>
+</p>
+
 # cairnpost-go
 
 The Go client for [CairnPost](https://github.com/mettjs/CairnPost), a
