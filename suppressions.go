@@ -34,7 +34,7 @@ type Suppression struct {
 type SuppressionQuery struct {
 	// Domain narrows to one sending domain; "" for all.
 	Domain string
-	// Limit is the page's size; 0 for the server's own (100).
+	// Limit is the page's size; 0 for the server's own (50). 200 at most.
 	Limit int
 	// After is the Next of the page before; "" for the first page.
 	After string
@@ -68,7 +68,7 @@ func (c *Client) Suppressions(ctx context.Context, q SuppressionQuery) (*Suppres
 func (c *Client) AllSuppressions(ctx context.Context, domain string) iter.Seq2[Suppression, error] {
 	return walk(func(after string) ([]Suppression, string, error) {
 		// The largest page the server gives: fewer calls for a long list.
-		page, err := c.Suppressions(ctx, SuppressionQuery{Domain: domain, Limit: 1000, After: after})
+		page, err := c.Suppressions(ctx, SuppressionQuery{Domain: domain, Limit: largestPage, After: after})
 		if err != nil {
 			return nil, "", err
 		}
@@ -116,6 +116,10 @@ func (c *Client) LiftAll(ctx context.Context, domain, reason string) (int, error
 	err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, &out)
 	return out.Lifted, err
 }
+
+// largestPage is the most a server gives in one page of any list: what
+// reading a whole list asks for.
+const largestPage = 200
 
 // paging is the query of a paged list.
 func paging(limit int, after string) url.Values {

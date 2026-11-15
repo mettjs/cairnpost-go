@@ -64,8 +64,8 @@ func TestWebhooksAndDeliveries(t *testing.T) {
 		}
 		ids = append(ids, d.ID)
 	}
-	if fmt.Sprint(ids) != "[d2 d1]" || s.seen[2].path != "/webhooks/w1/deliveries" || s.seen[2].query != "limit=500&state=failed" ||
-		s.seen[3].query != "after=d2&limit=500&state=failed" {
+	if fmt.Sprint(ids) != "[d2 d1]" || s.seen[2].path != "/webhooks/w1/deliveries" || s.seen[2].query != "limit=200&state=failed" ||
+		s.seen[3].query != "after=d2&limit=200&state=failed" {
 		t.Fatalf("%v %+v", ids, s.seen[2:4])
 	}
 	if err := c.RetryDelivery(ctx, "w1", "d1"); err != nil || s.seen[4].path != "/webhooks/w1/deliveries/d1/retry" {

@@ -24,7 +24,7 @@ func TestSuppressionsArePagedAndWalked(t *testing.T) {
 		got = append(got, sup.Address+":"+sup.Reason)
 	}
 	if fmt.Sprint(got) != "[a@example.org:bounce b@example.org:manual]" || len(s.seen) != 2 ||
-		s.seen[0].query != "domain=example.com&limit=1000" || s.seen[1].query != "after=cursor+1&domain=example.com&limit=1000" {
+		s.seen[0].query != "domain=example.com&limit=200" || s.seen[1].query != "after=cursor+1&domain=example.com&limit=200" {
 		t.Fatalf("%v %+v", got, s.seen)
 	}
 	page, err := c.Suppressions(ctx, SuppressionQuery{Limit: 5})

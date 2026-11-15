@@ -43,7 +43,7 @@ type Delivery struct {
 type DeliveryQuery struct {
 	// State narrows to one state (a Delivery constant); "" for all.
 	State string
-	// Limit is the page's size; 0 for the server's own (50).
+	// Limit is the page's size; 0 for the server's own (50). 200 at most.
 	Limit int
 	// After is the Next of the page before; "" for the first page.
 	After string
@@ -77,7 +77,7 @@ func (c *Client) Deliveries(ctx context.Context, webhookID string, q DeliveryQue
 // yields. Admin key.
 func (c *Client) AllDeliveries(ctx context.Context, webhookID, state string) iter.Seq2[Delivery, error] {
 	return walk(func(after string) ([]Delivery, string, error) {
-		page, err := c.Deliveries(ctx, webhookID, DeliveryQuery{State: state, Limit: 500, After: after})
+		page, err := c.Deliveries(ctx, webhookID, DeliveryQuery{State: state, Limit: largestPage, After: after})
 		if err != nil {
 			return nil, "", err
 		}
