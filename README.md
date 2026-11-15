@@ -101,6 +101,30 @@ emails a batch may hold (100 by default) and how long it may take; a
 server given more than its default minute wants a client with a longer
 timeout than `DefaultTimeout`.
 
+An email can be asked for now and sent later:
+
+```go
+sent, err := client.Send(ctx, cairnpost.Email{
+	// ...
+	ScheduledAt: time.Now().Add(24 * time.Hour),
+})
+// sent.ScheduledAt is when it goes; nothing was sent yet.
+
+err = client.Reschedule(ctx, sent.ID, time.Now().Add(48*time.Hour))
+err = client.Cancel(ctx, sent.ID)
+```
+
+Until its time the email's `State` is `StateScheduled`; from then on it
+is an email like any other, under the same id. `Cancel` and `Reschedule`
+answer an `*Error` named `ErrNotScheduled` once the email is being sent,
+was sent or was cancelled. The server keeps what a waiting email says,
+and its files, until it is sent or cancelled. An address suppressed by
+the time the email goes is left out; with nobody left in `To` or `Cc`,
+the email is cancelled and `Message.Reason` says `"suppressed"`.
+Revoking an API key cancels the emails it asked for that still wait. The
+emails of a `Batch` may each have a `ScheduledAt`. An `IdempotencyKey` is
+remembered for a day from the asking, not until the email goes.
+
 ## When a send fails
 
 The client never retries by itself. The error says what happened:

@@ -20,6 +20,10 @@ Every change a user of this client can notice is written here. The format is
 - `SendBatch`: several emails in one request, each with its own result;
   with an `IdempotencyKey` the same batch sent again sends only what did
   not go. `Failed` counts the emails that did not go.
+- Sending later: `Email.ScheduledAt` has an email sent at a time to come;
+  `Sent.ScheduledAt` says it waits. `Reschedule` and `Cancel` move and
+  cancel it. `StateScheduled`, `StateCancelled`, `Message.ScheduledAt` and
+  `Message.Reason`; `ErrNotScheduled` and `ErrScheduleFull`.
 - `Error`, `TransportError`, `MayHaveSent`, `IsNotFound` and
   `IsWrongAddress`: what the server refused, whether trying again is right,
   whether an email may have gone, and whether the base URL is at fault

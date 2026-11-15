@@ -31,6 +31,12 @@ const (
 	ErrUpstreamUnknown  = "upstream_unknown"
 	ErrUpstreamDown     = "upstream_unavailable"
 	ErrUnavailable      = "unavailable"
+	// ErrNotScheduled: the email to cancel or move does not wait to be
+	// sent: it is being sent, was sent, or was cancelled.
+	ErrNotScheduled = "not_scheduled"
+	// ErrScheduleFull: the emails waiting to be sent hold as much as the
+	// server keeps. Nothing was kept or sent.
+	ErrScheduleFull = "schedule_full"
 	// ErrNotStarted: a batch ended before this email's turn. Nothing of
 	// it was sent.
 	ErrNotStarted = "not_started"
@@ -44,7 +50,7 @@ var known = map[string]bool{
 	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
 	ErrTooLarge: true, ErrRateLimited: true,
 	ErrUpstreamUnknown: true, ErrUpstreamDown: true, ErrUnavailable: true, ErrInternal: true,
-	ErrNotStarted: true,
+	ErrNotStarted: true, ErrNotScheduled: true, ErrScheduleFull: true,
 }
 
 // Error is CairnPost saying no. Status and Name say what to do:

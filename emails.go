@@ -27,6 +27,10 @@ type Email struct {
 	Headers map[string]string
 	// Attachments are files to send with it, optional.
 	Attachments []Attachment
+	// ScheduledAt, when set, has the email sent at that time and not
+	// now: the server keeps it until then. It must be a time to come,
+	// and as far ahead as the server allows (30 days by default).
+	ScheduledAt time.Time
 	// IdempotencyKey makes a repeated send one email: the same key with
 	// the same content answers the first one's id. Use one for anything
 	// that may be retried. It is remembered for a day by default.
@@ -56,6 +60,10 @@ type Sent struct {
 	// all. An email with nobody left in To or Cc is an error instead
 	// (ErrRecipientSuppress): a Bcc alone is not sent.
 	Suppressed []string
+	// ScheduledAt is when the email will be sent, for one asked for with
+	// Email.ScheduledAt: it waits, and nothing was sent yet. Zero for an
+	// email that was sent.
+	ScheduledAt time.Time
 }
 
 // wire is an email as the server takes it: only the fields it names,
@@ -73,10 +81,18 @@ type wire struct {
 	// encoding/json writes a file's bytes in base64, as the server
 	// reads them.
 	Attachments []attachment `json:"attachments,omitempty"`
+	ScheduledAt *time.Time   `json:"scheduled_at,omitempty"`
 }
 
 func wireOf(e Email) wire {
-	return wire{e.From, e.To, e.Cc, e.Bcc, e.ReplyTo, e.Subject, e.HTML, e.Text, e.Headers, attachments(e.Attachments)}
+	w := wire{From: e.From, To: e.To, Cc: e.Cc, Bcc: e.Bcc, ReplyTo: e.ReplyTo, Subject: e.Subject, HTML: e.HTML, Text: e.Text,
+		Headers: e.Headers, Attachments: attachments(e.Attachments)}
+	if !e.ScheduledAt.IsZero() {
+		// Without a monotonic reading or a zone's name: the instant alone.
+		at := e.ScheduledAt.UTC().Round(0)
+		w.ScheduledAt = &at
+	}
+	return w
 }
 
 // Send sends an email and answers its id once the mail provider has taken
@@ -95,22 +111,27 @@ func (c *Client) Send(ctx context.Context, e Email) (*Sent, error) {
 		k.header = http.Header{"Idempotency-Key": {e.IdempotencyKey}}
 	}
 	var out struct {
-		ID         string   `json:"id"`
-		Suppressed []string `json:"suppressed"`
+		ID          string    `json:"id"`
+		Suppressed  []string  `json:"suppressed"`
+		ScheduledAt time.Time `json:"scheduled_at"`
 	}
 	if err := c.do(ctx, k, &out); err != nil {
 		return nil, err
 	}
-	if out.ID == "" {
+	if out.ID == "" || out.ScheduledAt.IsZero() != e.ScheduledAt.IsZero() {
 		// A 2xx with no id is not CairnPost's answer: whatever is at that
-		// address, the email is not known to have been sent.
+		// address, the email is not known to have been sent. Nor is one
+		// that does not say an email asked for later waits: a server too
+		// old to know the field would have refused it.
 		return nil, &TransportError{cause: errNotCairnPost}
 	}
-	return &Sent{ID: out.ID, Suppressed: out.Suppressed}, nil
+	return &Sent{ID: out.ID, Suppressed: out.Suppressed, ScheduledAt: out.ScheduledAt}, nil
 }
 
 // States of an email.
 const (
+	StateScheduled  = "scheduled"  // it waits to be sent at its time
+	StateCancelled  = "cancelled"  // it was to be sent later and was cancelled
 	StateSending    = "sending"    // handed to the provider, no answer yet
 	StateSent       = "sent"       // the provider took it
 	StateDeferred   = "deferred"   // the receiving server said "not now"
@@ -132,9 +153,17 @@ type Message struct {
 	Recipients []Recipient `json:"recipients"`
 	// Suppressed are the addresses it was asked to go to and did not,
 	// being on the suppression list when it was sent.
-	Suppressed []string  `json:"suppressed,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	Suppressed []string `json:"suppressed,omitempty"`
+	// ScheduledAt is when an email that waits will be sent, or would
+	// have been, had it not been cancelled; nil for one that was sent.
+	// Reason says why it was cancelled when nobody asked: "suppressed"
+	// (nobody it named in To or Cc could be sent to any more),
+	// "key_revoked" (its API key was revoked while it waited) or
+	// "failed" (the server could not send it).
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+	Reason      string     `json:"reason,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 	// Events are what happened to it after it was sent, oldest first.
 	Events []MessageEvent `json:"events"`
 	// Content is what the email said: nil unless the server keeps content,

@@ -44,7 +44,8 @@ func MayHaveSent(err error) bool {
 	case problem.Status >= 500:
 		// The server's send does not stop when its answer is lost on the
 		// way, so only its own word that nothing went counts.
-		return problem.Name != ErrUpstreamDown && problem.Name != ErrUnavailable && problem.Name != ErrNotStarted
+		return problem.Name != ErrUpstreamDown && problem.Name != ErrUnavailable && problem.Name != ErrNotStarted &&
+			problem.Name != ErrScheduleFull
 	}
 	return false
 }
