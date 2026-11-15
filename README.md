@@ -14,8 +14,8 @@ webhooks CairnPost sends.
 
 It uses the standard library only, and needs the Go version `go.mod` names.
 
-**Status: early.** It follows the server, which has no release yet. The
-[changelog](CHANGELOG.md) says what exists.
+**Status: early.** It follows the server release by release: this is 0.1.0,
+for CairnPost 0.1.0. The [changelog](CHANGELOG.md) says what exists.
 
 ```sh
 go get github.com/mettjs/cairnpost-go

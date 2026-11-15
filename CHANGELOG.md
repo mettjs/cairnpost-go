@@ -6,6 +6,8 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-15
+
 ### Added
 
 - `Send` and `Get`: send one email, with an `IdempotencyKey` that makes a
@@ -52,3 +54,6 @@ Every change a user of this client can notice is written here. The format is
   wrong base URL; `Captured` answers `ErrNotCapturing` from a server that
   delivers for real.
 - Options: `WithHTTPClient`, `WithUserAgent`, `WithMaxAnswerBytes`.
+
+[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mettjs/cairnpost-go/releases/tag/v0.1.0
