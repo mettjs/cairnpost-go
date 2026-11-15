@@ -221,12 +221,15 @@ func attachments(files []Attachment) []attachment {
 	return out
 }
 
-// File is what an attachment was: its bytes are kept by no server.
+// File is what an attachment was. Kept says the server still holds what
+// was in it, for FileContent to read: while the email waits to be sent,
+// and after that where the server keeps emails' files with what they said.
 type File struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
 	ContentID   string `json:"content_id,omitempty"`
 	Size        int    `json:"size"`
+	Kept        bool   `json:"kept,omitempty"`
 }
 
 // Content is what an email said, where the server is set to keep that.

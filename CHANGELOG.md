@@ -16,7 +16,8 @@ Every change a user of this client can notice is written here. The format is
   each address, and each `MessageEvent` names its address in `To`.
 - Attachments: `Email.Attachments` sends files with an email, beside it or
   shown in its HTML by a `ContentID`. `Content.Attachments` and
-  `CapturedEmail.Attachments` say what the files were.
+  `CapturedEmail.Attachments` say what the files were. `FileContent` reads
+  a file back from a server that keeps it, which `File.Kept` says.
 - `SendBatch`: several emails in one request, each with its own result;
   with an `IdempotencyKey` the same batch sent again sends only what did
   not go. `Failed` counts the emails that did not go.

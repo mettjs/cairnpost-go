@@ -56,9 +56,9 @@ cairnpost.Email{
 
 `ContentType` is told from the filename when left empty. The server sets
 how many files an email may carry and how large they may be in all (10
-files and 10 MiB by default). It never keeps what was in a file, and
-keeps what the file was (name, type, size) only where it is set to keep
-what emails say. Whether a file with a `ContentID` can be sent depends on the server's
+files and 10 MiB by default). It keeps a file only where it is set to
+keep what emails say, for as long, and while an email waits to be sent;
+`FileContent` reads one back. Whether a file with a `ContentID` can be sent depends on the server's
 mail provider.
 
 An email may name several addresses in `To`, `Cc` and `Bcc` (50 in all,
@@ -328,6 +328,7 @@ admin.LiftAll(ctx, "example.com", cairnpost.ReasonBounce)
 | `Deliveries`, `AllDeliveries`, `RetryDelivery` | What an endpoint was sent and how each went; try one again now. |
 | `Suppressions`, `AllSuppressions` | The addresses not sent to, a page at a time or all of them. |
 | `Suppress`, `Lift`, `LiftAll` | Block an address for a sending domain, or let it be sent to again. |
+| `FileContent` | What one of an email's files held, where the server keeps it (`File.Kept`). An admin key. |
 | `Captured` | The emails a development server (capture driver) kept instead of sending; `ErrNotCapturing` from a server that delivers for real. |
 
 In a `WebhookChange` a nil field is left as it is, and a field that is set

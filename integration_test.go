@@ -187,9 +187,25 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	}
 	// A file goes with an email, and a development server says what it
 	// was without holding what was in it.
-	if _, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"files@example.org"}, Subject: "With a file " + run, Text: "t",
-		Attachments: []Attachment{{Filename: "note-" + run + ".txt", Content: []byte("hello")}}}); err != nil {
+	filed, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"files@example.org"}, Subject: "With a file " + run, Text: "t",
+		Attachments: []Attachment{{Filename: "note-" + run + ".txt", Content: []byte("hello")}}})
+	if err != nil {
 		t.Fatal(err)
+	}
+	// A server that keeps emails' files gives one back; one that does not
+	// says there is none.
+	back, err := admin.FileContent(ctx, filed.ID, 1)
+	if m, getErr := admin.Get(ctx, filed.ID); getErr != nil {
+		t.Fatal(getErr)
+	} else if m.Content != nil && len(m.Content.Attachments) == 1 && m.Content.Attachments[0].Kept {
+		if err != nil || string(back) != "hello" {
+			t.Fatalf("the kept file: %q %v", back, err)
+		}
+	} else if !IsNotFound(err) {
+		t.Fatalf("a file that is not kept: %v", err)
+	}
+	if _, err := send.FileContent(ctx, filed.ID, 1); err == nil {
+		t.Fatal("a send key read a file")
 	}
 	withFile, err := admin.Captured(ctx)
 	if held := withFile; err != nil || len(held) == 0 || len(held[0].Attachments) != 1 || held[0].Attachments[0].Filename != "note-"+run+".txt" ||
