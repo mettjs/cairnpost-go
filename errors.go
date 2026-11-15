@@ -40,7 +40,13 @@ const (
 	// ErrNotStarted: a batch ended before this email's turn. Nothing of
 	// it was sent.
 	ErrNotStarted = "not_started"
-	ErrInternal   = "internal_error"
+	// ErrNameTaken: the sending domain already has a template of that
+	// name.
+	ErrNameTaken = "name_taken"
+	// ErrChangedMeanwhile: what was to be changed was changed by others
+	// at the same time. Read it and try again.
+	ErrChangedMeanwhile = "changed_meanwhile"
+	ErrInternal         = "internal_error"
 )
 
 // known is every name above: an answer under one of them is CairnPost's.
@@ -50,7 +56,7 @@ var known = map[string]bool{
 	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
 	ErrTooLarge: true, ErrRateLimited: true,
 	ErrUpstreamUnknown: true, ErrUpstreamDown: true, ErrUnavailable: true, ErrInternal: true,
-	ErrNotStarted: true, ErrNotScheduled: true, ErrScheduleFull: true,
+	ErrNotStarted: true, ErrNotScheduled: true, ErrScheduleFull: true, ErrNameTaken: true, ErrChangedMeanwhile: true,
 }
 
 // Error is CairnPost saying no. Status and Name say what to do:
