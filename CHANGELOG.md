@@ -28,7 +28,7 @@ Every change a user of this client can notice is written here. The format is
 - Templates: `Email.Template` makes an email from a template the server
   keeps, with a value for each of its variables. `CreateTemplate`,
   `Templates`, `Template`, `UpdateTemplate` and `DeleteTemplate` manage
-  them; `ErrNameTaken`.
+  them; `ErrNameTaken` and `ErrChangedMeanwhile`.
 - `Error`, `TransportError`, `MayHaveSent`, `IsNotFound` and
   `IsWrongAddress`: what the server refused, whether trying again is right,
   whether an email may have gone, and whether the base URL is at fault
