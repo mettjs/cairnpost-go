@@ -50,6 +50,12 @@ type Health struct {
 	Events   string `json:"events"`
 	Webhooks string `json:"webhooks"`
 	Pruning  string `json:"pruning"`
+	// Scheduled is whether the emails asked for ahead of time are being
+	// sent: "sending", "failing" or "off". Inbound, whether the server
+	// takes the emails that come for its domains' addresses: "on" or
+	// "off".
+	Scheduled string `json:"scheduled"`
+	Inbound   string `json:"inbound"`
 }
 
 // OK says the server is up and its database answers.

@@ -15,6 +15,11 @@ const (
 	// Suppression says which address. An email on record says the same
 	// in its own webhook (EventEmail.Suppressed).
 	EventAddressSuppressed = "address.suppressed"
+	// EventReceived tells of an email that came for an address of a
+	// sending domain. It is about no email that was sent: its Email is
+	// nil and its Received says who from, who for, and the id to read it
+	// by (Client.Received). It never says what the email says.
+	EventReceived = "email.received"
 	// EventTest is sent when an endpoint is tried out. It is about no
 	// email: its Email is nil.
 	EventTest = "webhook.test"
@@ -45,11 +50,26 @@ type Event struct {
 	Type string `json:"type"`
 	// At is when the event happened.
 	At time.Time `json:"created_at"`
-	// Email is the email the event is about; nil for webhook.test and
-	// address.suppressed.
+	// Email is the email the event is about; nil for webhook.test,
+	// address.suppressed and email.received.
 	Email *EventEmail `json:"email,omitempty"`
 	// Suppression is set for address.suppressed.
 	Suppression *EventSuppression `json:"suppression,omitempty"`
+	// Received is set for email.received.
+	Received *EventReceivedEmail `json:"received,omitempty"`
+}
+
+// EventReceivedEmail is the email an email.received webhook is about:
+// read what it says with Client.Received and an admin key.
+type EventReceivedEmail struct {
+	// ID is the received email's id.
+	ID string `json:"inbound_id"`
+	// From is who it came from, as the sending server said: "" for a
+	// mail server's own notice, such as a bounce. To is the address it
+	// came for.
+	From       string    `json:"from"`
+	To         []string  `json:"to"`
+	ReceivedAt time.Time `json:"received_at"`
 }
 
 // EventSuppression is the address an address.suppressed webhook is
