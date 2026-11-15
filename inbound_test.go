@@ -30,6 +30,16 @@ func TestAReceivedEmailIsReadWithWhatItSays(t *testing.T) {
 		s.seen[0].query != "after=in-3&limit=1" {
 		t.Fatalf("%+v %v %+v", page, err, s.seen[0])
 	}
+	// Reading them all asks for the largest page a server gives.
+	s, c = serve(t, 200, `{"data":[{"id":"in-9","to":"help@mail.example.com","received_at":"2030-01-01T00:00:00Z"}]}`)
+	for in, err := range c.AllReceived(ctx) {
+		if err != nil || in.ID != "in-9" {
+			t.Fatalf("%+v %v", in, err)
+		}
+	}
+	if len(s.seen) != 1 || s.seen[0].query != "limit=200" {
+		t.Fatalf("%+v", s.seen)
+	}
 	s, c = serve(t, 204, "")
 	if err := c.DeleteReceived(ctx, "in-1"); err != nil || s.seen[0].method != "DELETE" || s.seen[0].path != "/inbound/in-1" {
 		t.Fatalf("%v %+v", err, s.seen[0])

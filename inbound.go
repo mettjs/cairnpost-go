@@ -58,7 +58,7 @@ type ReceivedContent struct {
 
 // ReceivedQuery asks for a page of received emails.
 type ReceivedQuery struct {
-	// Limit is the page's size; 0 for the server's own (100).
+	// Limit is the page's size; 0 for the server's own (50). 200 at most.
 	Limit int
 	// After is the Next of the page before; "" for the first page.
 	After string
@@ -88,7 +88,7 @@ func (c *Client) ReceivedList(ctx context.Context, q ReceivedQuery) (*ReceivedPa
 // key.
 func (c *Client) AllReceived(ctx context.Context) iter.Seq2[Received, error] {
 	return walk(func(after string) ([]Received, string, error) {
-		page, err := c.ReceivedList(ctx, ReceivedQuery{After: after})
+		page, err := c.ReceivedList(ctx, ReceivedQuery{Limit: largestPage, After: after})
 		if err != nil {
 			return nil, "", err
 		}
