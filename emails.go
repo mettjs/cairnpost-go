@@ -27,6 +27,10 @@ type Email struct {
 	Headers map[string]string
 	// Attachments are files to send with it, optional.
 	Attachments []Attachment
+	// Template, when set, makes the email from a template the server
+	// keeps, in place of HTML and Text, which must then be empty. A
+	// Subject given with it is used instead of the template's.
+	Template *UseTemplate
 	// ScheduledAt, when set, has the email sent at that time and not
 	// now: the server keeps it until then. It must be a time to come,
 	// and as far ahead as the server allows (30 days by default).
@@ -82,11 +86,12 @@ type wire struct {
 	// reads them.
 	Attachments []attachment `json:"attachments,omitempty"`
 	ScheduledAt *time.Time   `json:"scheduled_at,omitempty"`
+	Template    *UseTemplate `json:"template,omitempty"`
 }
 
 func wireOf(e Email) wire {
 	w := wire{From: e.From, To: e.To, Cc: e.Cc, Bcc: e.Bcc, ReplyTo: e.ReplyTo, Subject: e.Subject, HTML: e.HTML, Text: e.Text,
-		Headers: e.Headers, Attachments: attachments(e.Attachments)}
+		Headers: e.Headers, Attachments: attachments(e.Attachments), Template: e.Template}
 	if !e.ScheduledAt.IsZero() {
 		// Without a monotonic reading or a zone's name: the instant alone.
 		at := e.ScheduledAt.UTC().Round(0)

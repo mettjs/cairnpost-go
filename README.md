@@ -125,6 +125,41 @@ Revoking an API key cancels the emails it asked for that still wait. The
 emails of a `Batch` may each have a `ScheduledAt`. An `IdempotencyKey` is
 remembered for a day from the asking, not until the email goes.
 
+## Templates
+
+A template is an email the server keeps, written once with variables as
+`{{name}}`. An admin key keeps one, and any key sends from it:
+
+```go
+_, err := admin.CreateTemplate(ctx, cairnpost.NewTemplate{
+	Name:     "welcome",
+	Subject:  "Welcome, {{name}}",
+	HTML:     "<p>Your code is <b>{{code}}</b></p>",
+	Text:     "Your code is {{code}}",
+	Defaults: map[string]string{"name": "there"},
+})
+
+sent, err := client.Send(ctx, cairnpost.Email{
+	From: "app@example.com",
+	To:   []string{"ana@example.org"},
+	Template: &cairnpost.UseTemplate{
+		Name:      "welcome",
+		Variables: map[string]string{"code": "4821"},
+	},
+})
+```
+
+Leave `HTML` and `Text` empty with a `Template`; a `Subject` given with
+it is used instead of the template's. A value is written as it is in the
+subject and the text and escaped in the HTML, so it is never markup. A
+variable with no default must be given, and a value for a variable the
+template does not name is refused: both are an `*Error` with status 422,
+and nothing is sent. The email is filled when it is asked for, so one
+that waits (`ScheduledAt`) keeps what it was filled with whatever becomes
+of the template. A template belongs to a sending domain or, with an empty
+`Domain` and a key bound to none, serves every domain; a send gets its
+own domain's template of that name first.
+
 ## When a send fails
 
 The client never retries by itself. The error says what happened:
@@ -328,6 +363,7 @@ admin.LiftAll(ctx, "example.com", cairnpost.ReasonBounce)
 | `Deliveries`, `AllDeliveries`, `RetryDelivery` | What an endpoint was sent and how each went; try one again now. |
 | `Suppressions`, `AllSuppressions` | The addresses not sent to, a page at a time or all of them. |
 | `Suppress`, `Lift`, `LiftAll` | Block an address for a sending domain, or let it be sent to again. |
+| `CreateTemplate`, `Templates`, `Template`, `UpdateTemplate`, `DeleteTemplate` | Manage the templates emails are sent from. `ErrNameTaken` for a name its domain has. |
 | `FileContent` | What one of an email's files held, where the server keeps it (`File.Kept`). An admin key. |
 | `Captured` | The emails a development server (capture driver) kept instead of sending; `ErrNotCapturing` from a server that delivers for real. |
 

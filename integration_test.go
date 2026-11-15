@@ -212,6 +212,48 @@ func TestSendingAgainstARealServer(t *testing.T) {
 		held[0].Attachments[0].Size != 5 || !strings.HasPrefix(held[0].Attachments[0].ContentType, "text/plain") {
 		t.Fatalf("the captured file: %+v %v", held, err)
 	}
+	// A template is kept by an admin key and sent from by any; what the
+	// development server kept says how it was filled.
+	kept, err := admin.CreateTemplate(ctx, NewTemplate{Name: "t-" + strings.ToLower(run), Domain: domain,
+		Subject: "Code for {{name}} " + run, HTML: "<b>{{code}}</b>", Text: "{{code}}", Defaults: map[string]string{"name": "you"}})
+	if err != nil || len(kept.Variables) != 2 || kept.Domain != domain {
+		t.Fatalf("%+v %v", kept, err)
+	}
+	if _, err := admin.CreateTemplate(ctx, NewTemplate{Name: kept.Name, Domain: domain, Subject: "s", Text: "t"}); named(err) != ErrNameTaken {
+		t.Fatalf("the same name twice: %v", err)
+	}
+	use := &UseTemplate{Name: kept.Name, Variables: map[string]string{"code": "<1>"}}
+	if _, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"filled@example.org"}, Template: use}); err != nil {
+		t.Fatal(err)
+	}
+	if held, err := admin.Captured(ctx); err != nil || held[0].Subject != "Code for you "+run || held[0].HTML != "<b>&lt;1&gt;</b>" || held[0].Text != "<1>" {
+		t.Fatalf("the filled email: %+v %v", held, err)
+	}
+	if _, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"filled@example.org"}, Template: &UseTemplate{Name: kept.Name}}); named(err) != ErrValidation {
+		t.Fatalf("a variable with no value: %v", err)
+	}
+	// A change must leave the template whole: a default for a variable
+	// it no longer names is refused.
+	orphaned := "Changed " + run
+	if _, err := admin.UpdateTemplate(ctx, kept.ID, TemplateChange{Subject: &orphaned}); named(err) != ErrValidation {
+		t.Fatalf("a default left for no variable: %v", err)
+	}
+	subject := "Changed {{name}} " + run
+	if got, err := admin.UpdateTemplate(ctx, kept.ID, TemplateChange{Subject: &subject}); err != nil || got.Subject != subject || got.HTML != "<b>{{code}}</b>" {
+		t.Fatalf("%+v %v", got, err)
+	}
+	if list, err := admin.Templates(ctx); err != nil || len(list) == 0 {
+		t.Fatalf("%+v %v", list, err)
+	}
+	if _, err := send.Templates(ctx); err == nil {
+		t.Fatal("a send key listed templates")
+	}
+	if err := admin.DeleteTemplate(ctx, kept.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Template(ctx, kept.ID); !IsNotFound(err) {
+		t.Fatalf("read once deleted: %v", err)
+	}
 	// Among several, a suppressed address is left out and named; the email
 	// is one, with an outcome for each address it went to.
 	several, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"ana@example.org", gone},
