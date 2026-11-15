@@ -254,6 +254,32 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if _, err := admin.Template(ctx, kept.ID); !IsNotFound(err) {
 		t.Fatalf("read once deleted: %v", err)
 	}
+	// The emails that came, where the server takes any: each is read as
+	// it reads and as it came. A send key reads none.
+	if h, err := admin.Health(ctx); err != nil || (h.Inbound != "on" && h.Inbound != "off") {
+		t.Fatalf("%+v %v", h, err)
+	}
+	came, err := admin.ReceivedList(ctx, ReceivedQuery{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(came.Data) == 1 {
+		one, err := admin.Received(ctx, came.Data[0].ID)
+		if err != nil || one.Content == nil || one.To == "" || one.KeptUntil.Before(one.ReceivedAt) {
+			t.Fatalf("%+v %v", one, err)
+		}
+		if raw, err := admin.ReceivedRaw(ctx, one.ID); err != nil || len(raw) != one.Size {
+			t.Fatalf("as it came: %d bytes of %d, %v", len(raw), one.Size, err)
+		}
+		if len(one.Content.Attachments) > 0 {
+			if file, err := admin.ReceivedFile(ctx, one.ID, 1); err != nil || len(file) != one.Content.Attachments[0].Size {
+				t.Fatalf("its file: %d bytes, %v", len(file), err)
+			}
+		}
+		if _, err := send.Received(ctx, one.ID); err == nil {
+			t.Fatal("a send key read an email that came")
+		}
+	}
 	// Among several, a suppressed address is left out and named; the email
 	// is one, with an outcome for each address it went to.
 	several, err := send.Send(ctx, Email{From: "app@" + domain, To: []string{"ana@example.org", gone},

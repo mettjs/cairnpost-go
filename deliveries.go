@@ -21,6 +21,9 @@ type Delivery struct {
 	// EmailID is the email the webhook is about; "" for one about no
 	// email (EventAddressSuppressed).
 	EmailID string `json:"email_id"`
+	// InboundID is the received email the webhook is about, for an
+	// EventReceived.
+	InboundID string `json:"inbound_id"`
 	// Type is the webhook's type (the Event constants).
 	Type string `json:"type"`
 	// State is one of the Delivery constants.

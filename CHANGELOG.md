@@ -29,6 +29,10 @@ Every change a user of this client can notice is written here. The format is
   keeps, with a value for each of its variables. `CreateTemplate`,
   `Templates`, `Template`, `UpdateTemplate` and `DeleteTemplate` manage
   them; `ErrNameTaken` and `ErrChangedMeanwhile`.
+- Receiving email: `EventReceived` and `Event.Received` tell of an email
+  that came; `Received`, `ReceivedList`, `AllReceived`, `ReceivedRaw`,
+  `ReceivedFile` and `DeleteReceived` read and delete what the server
+  keeps. `Delivery.InboundID`; `Health.Inbound` and `Health.Scheduled`.
 - `Error`, `TransportError`, `MayHaveSent`, `IsNotFound` and
   `IsWrongAddress`: what the server refused, whether trying again is right,
   whether an email may have gone, and whether the base URL is at fault

@@ -297,6 +297,11 @@ http.HandleFunc("/webhooks/cairnpost", func(w http.ResponseWriter, r *http.Reque
   webhook sent to try an endpoint out.
 - `event.Email.To` holds the one address the event is about, also when
   the email went to several; `event.Email.ID` is the email's one id.
+- `email.received` (`cairnpost.EventReceived`) tells of an email that
+  came for one of your addresses, where the server takes them. It is
+  about no email you sent: `event.Email` is nil and `event.Received`
+  says who it is from and for, and the id to read it by (see "Receiving
+  email"). An endpoint that hears about every event gets these too.
 - `address.suppressed` (`cairnpost.EventAddressSuppressed`) tells of an
   address suppressed because of a bounce or a complaint about an email
   the server has no record of. It names no email: `event.Suppression`
@@ -315,6 +320,29 @@ http.HandleFunc("/webhooks/cairnpost", func(w http.ResponseWriter, r *http.Reque
 
 The signature is the Standard Webhooks scheme, which Svix also uses, so any
 verifier for either works too.
+
+## Receiving email
+
+A server set up to take the emails that come for its domains' addresses
+keeps each for a time (7 days by default) and tells your endpoint with an
+`email.received` webhook. Read it with an admin key:
+
+```go
+if event.Type == cairnpost.EventReceived {
+	got, err := admin.Received(ctx, event.Received.ID)
+	// got.Content.Subject, .Text, .HTML, .Attachments ...
+	pdf, err := admin.ReceivedFile(ctx, got.ID, 1) // its first file
+	raw, err := admin.ReceivedRaw(ctx, got.ID)     // every byte, as it came
+}
+```
+
+A stranger wrote it: treat every part as untrusted, and never show its
+HTML as a page. `got.From` is what the sending server said and
+`got.Content.From` what the email says of itself; either can be made up.
+`Content.Partial` says some of it could not be read as it was written
+(a charset the server does not know); `ReceivedRaw` always has all of it.
+`ReceivedList` and `AllReceived` list what is kept, and `DeleteReceived`
+deletes one before its time. `IsNotFound` says an email's time is up.
 
 ## With an admin key
 
@@ -364,6 +392,7 @@ admin.LiftAll(ctx, "example.com", cairnpost.ReasonBounce)
 | `Deliveries`, `AllDeliveries`, `RetryDelivery` | What an endpoint was sent and how each went; try one again now. |
 | `Suppressions`, `AllSuppressions` | The addresses not sent to, a page at a time or all of them. |
 | `Suppress`, `Lift`, `LiftAll` | Block an address for a sending domain, or let it be sent to again. |
+| `Received`, `ReceivedList`, `AllReceived`, `ReceivedRaw`, `ReceivedFile`, `DeleteReceived` | The emails that came for your addresses, while the server keeps them. |
 | `CreateTemplate`, `Templates`, `Template`, `UpdateTemplate`, `DeleteTemplate` | Manage the templates emails are sent from. `ErrNameTaken` for a name its domain has. |
 | `FileContent` | What one of an email's files held, where the server keeps it (`File.Kept`). An admin key. |
 | `Captured` | The emails a development server (capture driver) kept instead of sending; `ErrNotCapturing` from a server that delivers for real. |

@@ -120,6 +120,15 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 		return nil, ErrPayload
 	}
 	e := &Event{ID: id, Type: wire.Type, At: wire.CreatedAt}
+	if e.Type == EventReceived {
+		// It is about an email that came, and must say which and for whom.
+		var r EventReceivedEmail
+		if json.Unmarshal(wire.Data, &r) != nil || r.ID == "" || len(r.To) == 0 {
+			return nil, ErrPayload
+		}
+		e.Received = &r
+		return e, nil
+	}
 	var email EventEmail
 	readable := json.Unmarshal(wire.Data, &email) == nil && email.ID != "" && len(email.To) > 0
 	switch {
