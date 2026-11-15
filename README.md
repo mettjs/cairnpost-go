@@ -151,7 +151,8 @@ sent, err := client.Send(ctx, cairnpost.Email{
 
 Leave `HTML` and `Text` empty with a `Template`; a `Subject` given with
 it is used instead of the template's. A value is written as it is in the
-subject and the text and escaped in the HTML, so it is never markup. A
+subject and the text and escaped in the HTML, so it is never markup
+there: keep attributes in quotes (`href="{{link}}"`). A
 variable with no default must be given, and a value for a variable the
 template does not name is refused: both are an `*Error` with status 422,
 and nothing is sent. The email is filled when it is asked for, so one

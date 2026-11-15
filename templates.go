@@ -3,6 +3,7 @@ package cairnpost
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -75,15 +76,27 @@ func (c *Client) template(ctx context.Context, k call) (*Template, error) {
 	return &t, nil
 }
 
-// Templates answers the templates the key manages, each without its
-// bodies: every one, or its sending domain's if it is bound to one.
-// Admin key.
-func (c *Client) Templates(ctx context.Context) ([]Template, error) {
-	var out struct {
-		Data []Template `json:"data"`
+// TemplateList is a list of templates, each without its bodies. More
+// says the server has others than the list holds: ask for one sending
+// domain's to see them.
+type TemplateList struct {
+	Data []Template `json:"data"`
+	More bool       `json:"more"`
+}
+
+// Templates answers the templates the key manages, by sending domain
+// and name: its own domain's if it is bound to one; otherwise those of
+// the domain given, or all for "". Admin key.
+func (c *Client) Templates(ctx context.Context, domain string) (*TemplateList, error) {
+	k := call{method: http.MethodGet, path: []string{"templates"}}
+	if domain != "" {
+		k.query = url.Values{"domain": {domain}}
 	}
-	err := c.do(ctx, call{method: http.MethodGet, path: []string{"templates"}}, &out)
-	return out.Data, err
+	var out TemplateList
+	if err := c.do(ctx, k, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // Template answers one template whole. IsNotFound says there is none,
@@ -105,7 +118,9 @@ type TemplateChange struct {
 
 // UpdateTemplate changes a template and answers it as it now is. Emails
 // asked for from then on are made from it; one that already waits to be
-// sent keeps what it was filled with. Admin key.
+// sent keeps what it was filled with. An *Error named ErrChangedMeanwhile
+// says others kept changing it at the same time: read it and try again.
+// Admin key.
 func (c *Client) UpdateTemplate(ctx context.Context, id string, change TemplateChange) (*Template, error) {
 	if change.Defaults != nil && *change.Defaults == nil {
 		// A nil map is written as null, which the server reads as "leave

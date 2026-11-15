@@ -47,9 +47,12 @@ func TestTemplatesAreKeptReadChangedAndDeleted(t *testing.T) {
 	if _, err := c.Template(ctx, ""); err == nil || len(s.seen) != 2 {
 		t.Fatalf("an empty id was asked of the server: %v", err)
 	}
-	s, c = serve(t, 200, `{"data":[`+one+`]}`)
-	if list, err := c.Templates(ctx); err != nil || len(list) != 1 || list[0].ID != "t-1" {
+	s, c = serve(t, 200, `{"data":[`+one+`],"more":true}`)
+	if list, err := c.Templates(ctx, ""); err != nil || len(list.Data) != 1 || list.Data[0].ID != "t-1" || !list.More || s.seen[0].query != "" {
 		t.Fatalf("%+v %v", list, err)
+	}
+	if _, err := c.Templates(ctx, "shop.example.com"); err != nil || s.seen[1].query != "domain=shop.example.com" {
+		t.Fatalf("%v %+v", err, s.seen[1])
 	}
 	s, c = serve(t, 204, "")
 	if err := c.DeleteTemplate(ctx, "t-1"); err != nil || s.seen[0].method != "DELETE" || s.seen[0].path != "/templates/t-1" {

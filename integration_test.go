@@ -242,10 +242,10 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if got, err := admin.UpdateTemplate(ctx, kept.ID, TemplateChange{Subject: &subject}); err != nil || got.Subject != subject || got.HTML != "<b>{{code}}</b>" {
 		t.Fatalf("%+v %v", got, err)
 	}
-	if list, err := admin.Templates(ctx); err != nil || len(list) == 0 {
+	if list, err := admin.Templates(ctx, domain); err != nil || len(list.Data) != 1 || list.Data[0].HTML != "" || len(list.Data[0].Variables) != 2 {
 		t.Fatalf("%+v %v", list, err)
 	}
-	if _, err := send.Templates(ctx); err == nil {
+	if _, err := send.Templates(ctx, ""); err == nil {
 		t.Fatal("a send key listed templates")
 	}
 	if err := admin.DeleteTemplate(ctx, kept.ID); err != nil {
