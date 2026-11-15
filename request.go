@@ -41,6 +41,9 @@ type call struct {
 	// plain marks a route that needs no key and answers its own body on
 	// any status.
 	plain bool
+	// file marks a route whose answer is a file's bytes, not JSON: out is
+	// a *[]byte.
+	file bool
 }
 
 // do makes a call and decodes a 2xx answer into out (nil to ignore it).
@@ -85,6 +88,9 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
+	if k.file {
+		req.Header.Set("Accept", "application/octet-stream, application/json")
+	}
 	req.Header.Set("User-Agent", c.agent)
 	if !k.plain {
 		req.Header.Set("Authorization", "Bearer "+c.key)
@@ -110,6 +116,14 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		}
 	}
 	if out == nil {
+		return nil
+	}
+	if k.file {
+		// Anything else that answers 200 here is not a CairnPost server.
+		if res.Header.Get("Content-Type") != "application/octet-stream" {
+			return &TransportError{cause: errNotCairnPost}
+		}
+		*out.(*[]byte) = raw
 		return nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
