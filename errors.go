@@ -12,14 +12,20 @@ import (
 const (
 	ErrValidation         = "validation_error"
 	ErrRejectedByUpstream = "rejected_by_upstream"
-	ErrRecipientSuppress  = "recipient_suppressed"
-	ErrIdempotentMismatch = "invalid_idempotent_request"
-	ErrIdempotentInFlight = "concurrent_idempotent_requests"
-	ErrMissingKey         = "missing_api_key"
-	ErrInvalidKey         = "invalid_api_key"
-	ErrDomainNotAllowed   = "domain_not_allowed"
-	ErrAdminKeyRequired   = "admin_key_required"
-	ErrNotFound           = "not_found"
+	// ErrSenderDomainNotReady: the mail provider refused the email, and
+	// the sending domain's DNS lacks a record the provider asks. The
+	// domain is likely not set up with the provider, which then refuses
+	// every email from it: this is the sender failing, not one bad
+	// email. A server before 0.1.1 says ErrRejectedByUpstream instead.
+	ErrSenderDomainNotReady = "sender_domain_not_ready"
+	ErrRecipientSuppress    = "recipient_suppressed"
+	ErrIdempotentMismatch   = "invalid_idempotent_request"
+	ErrIdempotentInFlight   = "concurrent_idempotent_requests"
+	ErrMissingKey           = "missing_api_key"
+	ErrInvalidKey           = "invalid_api_key"
+	ErrDomainNotAllowed     = "domain_not_allowed"
+	ErrAdminKeyRequired     = "admin_key_required"
+	ErrNotFound             = "not_found"
 	// ErrRouteNotFound: the server has nothing at the path asked for. The
 	// base URL is wrong, or the server is older than this client.
 	ErrRouteNotFound = "route_not_found"
@@ -51,7 +57,7 @@ const (
 
 // known is every name above: an answer under one of them is CairnPost's.
 var known = map[string]bool{
-	ErrValidation: true, ErrRejectedByUpstream: true, ErrRecipientSuppress: true, ErrIdempotentMismatch: true,
+	ErrValidation: true, ErrRejectedByUpstream: true, ErrSenderDomainNotReady: true, ErrRecipientSuppress: true, ErrIdempotentMismatch: true,
 	ErrIdempotentInFlight: true, ErrMissingKey: true, ErrInvalidKey: true, ErrDomainNotAllowed: true,
 	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
 	ErrTooLarge: true, ErrRateLimited: true,
@@ -62,6 +68,8 @@ var known = map[string]bool{
 // Error is CairnPost saying no. Status and Name say what to do:
 //
 //   - 422: the request is at fault and will never succeed. Do not retry.
+//     Under sender_domain_not_ready no email from that domain will be
+//     sent until the domain is set up with the mail provider.
 //   - 409 invalid_idempotent_request: the key was used for another email,
 //     which was sent. Do not retry.
 //   - 409 concurrent_idempotent_requests, 429, 503: nothing was sent. Try

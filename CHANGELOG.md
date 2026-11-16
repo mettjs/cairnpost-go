@@ -6,6 +6,14 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Added
+
+- `ErrSenderDomainNotReady`, the name CairnPost 0.1.1 answers (422) when
+  the mail provider refuses an email and the sending domain's DNS lacks a
+  record the provider asks: the domain is likely not set up, and nothing
+  from it will be sent until it is. An older client reads that answer as
+  a 422 with an empty `Name`, so take this version before the server's.
+
 ## [0.1.0] - 2026-11-15
 
 ### Added
