@@ -33,10 +33,13 @@ const (
 	// method. The server is older or newer than this client.
 	ErrMethodNotAllowed = "method_not_allowed"
 	ErrTooLarge         = "request_too_large"
-	ErrRateLimited      = "rate_limit_exceeded"
-	ErrUpstreamUnknown  = "upstream_unknown"
-	ErrUpstreamDown     = "upstream_unavailable"
-	ErrUnavailable      = "unavailable"
+	// ErrRequestIncomplete: the request did not arrive whole in time.
+	// Nothing was done with it; try again.
+	ErrRequestIncomplete = "request_incomplete"
+	ErrRateLimited       = "rate_limit_exceeded"
+	ErrUpstreamUnknown   = "upstream_unknown"
+	ErrUpstreamDown      = "upstream_unavailable"
+	ErrUnavailable       = "unavailable"
 	// ErrNotScheduled: the email to cancel or move does not wait to be
 	// sent: it is being sent, was sent, or was cancelled.
 	ErrNotScheduled = "not_scheduled"
@@ -60,7 +63,7 @@ var known = map[string]bool{
 	ErrValidation: true, ErrRejectedByUpstream: true, ErrSenderDomainNotReady: true, ErrRecipientSuppress: true, ErrIdempotentMismatch: true,
 	ErrIdempotentInFlight: true, ErrMissingKey: true, ErrInvalidKey: true, ErrDomainNotAllowed: true,
 	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
-	ErrTooLarge: true, ErrRateLimited: true,
+	ErrTooLarge: true, ErrRequestIncomplete: true, ErrRateLimited: true,
 	ErrUpstreamUnknown: true, ErrUpstreamDown: true, ErrUnavailable: true, ErrInternal: true,
 	ErrNotStarted: true, ErrNotScheduled: true, ErrScheduleFull: true, ErrNameTaken: true, ErrChangedMeanwhile: true,
 }
@@ -72,10 +75,10 @@ var known = map[string]bool{
 //     sent until the domain is set up with the mail provider.
 //   - 409 invalid_idempotent_request: the key was used for another email,
 //     which was sent. Do not retry.
-//   - 409 concurrent_idempotent_requests, 429, 503: nothing was sent. Try
-//     again, after RetryAfter when it is set.
-//   - 502 upstream_unknown, and any 5xx that is not CairnPost's own: the
-//     email may have gone. Try again with the same Idempotency-Key, and
+//   - 409 concurrent_idempotent_requests, 408 request_incomplete, 429,
+//     503: nothing was sent. Try again, after RetryAfter when it is set.
+//   - 502 upstream_unknown, and any 5xx or 408 that is not CairnPost's
+//     own: the email may have gone. Try again with the same Idempotency-Key, and
 //     only with it. MayHaveSent says which errors these are.
 type Error struct {
 	Status int
@@ -112,8 +115,9 @@ func (e *Error) Error() string {
 func (e *Error) Retryable() bool {
 	switch {
 	case e.Name == ErrIdempotentInFlight, e.Status == http.StatusTooManyRequests, e.Status == http.StatusRequestTimeout:
-		// The last is a request that did not arrive whole: nothing was
-		// done with it.
+		// The last is a request that did not arrive whole in time. Under
+		// CairnPost's own name nothing was done with it; MayHaveSent says
+		// what one from something in between leaves open.
 		return true
 	case e.Status == http.StatusConflict:
 		return false

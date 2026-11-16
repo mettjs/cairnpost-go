@@ -3,6 +3,9 @@ package cairnpost
 import (
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +27,9 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 		{422, `{"name":"recipient_suppressed","message":"Suppressed.","id":"msg-9"}`, "", ErrRecipientSuppress, "msg-9", false, true},
 		{409, `{"name":"invalid_idempotent_request","message":"Used."}`, "", ErrIdempotentMismatch, "", false, false},
 		{409, `{"name":"concurrent_idempotent_requests","message":"In flight."}`, "7", ErrIdempotentInFlight, "", true, false},
+		{408, `{"name":"request_incomplete","message":"Not whole."}`, "", ErrRequestIncomplete, "", true, false},
+		// A 408 from something in between may come after the server took it.
+		{408, `<html>request timeout</html>`, "", "", "", true, true},
 		{429, `{"name":"rate_limit_exceeded","message":"Limit.","id":"msg-2"}`, "30", ErrRateLimited, "msg-2", true, false},
 		{502, `{"name":"upstream_unknown","message":"Lost.","id":"msg-3"}`, "", ErrUpstreamUnknown, "msg-3", true, true},
 		{503, `{"name":"upstream_unavailable","message":"Down."}`, "", ErrUpstreamDown, "", true, false},
@@ -51,7 +57,8 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 		}
 		wait, _ := time.ParseDuration(want.after + "s")
 		if problem.Status != want.status || problem.Name != want.name || problem.EmailID != want.id ||
-			problem.RetryAfter != wait || problem.Retryable() != want.retry || MayHaveSent(err) != want.mayBeOut {
+			problem.RetryAfter != wait || problem.Retryable() != want.retry || MayHaveSent(err) != want.mayBeOut ||
+			(problem.Message == "") != (want.name == "") {
 			t.Errorf("%d %s: %+v, retryable %v, may have sent %v", want.status, want.name, problem, problem.Retryable(), MayHaveSent(err))
 		}
 	}
@@ -168,5 +175,33 @@ func TestAWrongAddressIsNotAMissingRecord(t *testing.T) {
 	}
 	if IsWrongAddress(nil) || IsWrongAddress(&TransportError{}) {
 		t.Fatal("no answer at all is not a wrong address")
+	}
+}
+
+// Every name the client has a constant for is one it believes: a constant
+// left out of known would come back with no name and no message.
+func TestEveryErrorNameIsKnown(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "errors.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := 0
+	ast.Inspect(file, func(n ast.Node) bool {
+		spec, ok := n.(*ast.ValueSpec)
+		if !ok || len(spec.Names) != 1 || len(spec.Values) != 1 || !strings.HasPrefix(spec.Names[0].Name, "Err") {
+			return true
+		}
+		lit, ok := spec.Values[0].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		name, _ := strconv.Unquote(lit.Value)
+		if names++; !known[name] {
+			t.Errorf("%s (%q) is not in known", spec.Names[0].Name, name)
+		}
+		return true
+	})
+	if names != len(known) || names < 20 {
+		t.Errorf("%d constants, %d known names", names, len(known))
 	}
 }
