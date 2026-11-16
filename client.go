@@ -16,7 +16,7 @@ import (
 )
 
 // Version is this client's version, said in its User-Agent.
-const Version = "0.1.0"
+const Version = "0.1.1"
 
 // DefaultTimeout is how long a call may take with the client's own HTTP
 // client. It is longer than the server gives its slowest answer, a

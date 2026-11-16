@@ -6,6 +6,8 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-15
+
 ### Added
 
 - `ErrSenderDomainNotReady`, the name CairnPost 0.1.1 answers (422) when
@@ -63,5 +65,6 @@ Every change a user of this client can notice is written here. The format is
   delivers for real.
 - Options: `WithHTTPClient`, `WithUserAgent`, `WithMaxAnswerBytes`.
 
-[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mettjs/cairnpost-go/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mettjs/cairnpost-go/releases/tag/v0.1.0
