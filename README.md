@@ -194,9 +194,9 @@ default:
 |---|---|
 | `*Error`, status 422 | The request is at fault and will never succeed. `recipient_suppressed` is one of them. |
 | `*Error`, 409 `invalid_idempotent_request` | The key was used for a different email, which was sent. |
-| `*Error`, 409 `concurrent_idempotent_requests`, 408, 429, 503 | Nothing was sent. Try again, after `RetryAfter` when set. A 408 is a request that did not arrive whole in time, a 503 can be a server busy with other large emails. |
+| `*Error`, 409 `concurrent_idempotent_requests`, 408 `request_incomplete`, 429, 503 | Nothing was sent. Try again, after `RetryAfter` when set. The 408 is a request that did not arrive whole in time, a 503 can be a server busy with other large emails. |
 | `*Error`, 502 `upstream_unknown` | The mail provider did not answer. The email may have gone. |
-| `*Error`, any other 5xx but the 503s above | The server failed after it began, or something in between answered for it (a proxy's 502). The email may have gone. |
+| `*Error`, any other 5xx but the 503s above, or a 408 that is not CairnPost's own | The server failed after it began, or something in between answered for it (a proxy's 502 or 408). The email may have gone. |
 | `*TransportError` | The server was not reached, or its answer never came. For a send, the email may have gone. |
 
 `MayHaveSent` is true for the last three, and for a `recipient_suppressed`

@@ -6,13 +6,21 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Added
+
+- `ErrRequestIncomplete`, the name of the server's 408: a request that did
+  not arrive whole in time.
+
 ### Fixed
 
-- A 408 `request_incomplete` (a request that did not arrive whole in time)
-  is now read as CairnPost's own answer: `Error.Name` is
-  `ErrRequestIncomplete` and `Error.Message` the server's sentence. Before,
-  the name was not known to the client, so both were empty; `Retryable`
-  already said to try again.
+- A 408 `request_incomplete` is now read as CairnPost's own answer:
+  `Error.Name` is `ErrRequestIncomplete` and `Error.Message` the server's
+  sentence. Before, the name was not known to the client, so both were
+  empty; `Retryable` already said to try again.
+- `MayHaveSent` is now true of a 408 that is not CairnPost's own. A proxy
+  can answer one after it passed the request on, while the server is still
+  sending: such an email may have gone, and is to be retried only with the
+  same `IdempotencyKey`.
 
 ## [0.1.1] - 2026-11-15
 

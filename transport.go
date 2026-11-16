@@ -23,6 +23,8 @@ func (e *TransportError) Unwrap() error { return e.cause }
 // the server's own answer never came or came from something in between
 // (a proxy's 502), or the server failed after it began. Then the only
 // safe retry is one with the same Idempotency-Key. It is also true of a
+// 408 that is not CairnPost's own, which a proxy may answer after it
+// passed the request on, and of a
 // recipient_suppressed that carries an EmailID: nothing was sent now, but
 // that earlier try may have gone. That one is not to be retried, since
 // the address is suppressed: read the EmailID with Get instead. After any
@@ -37,6 +39,10 @@ func MayHaveSent(err error) bool {
 		return true
 	case !errors.As(err, &problem):
 		return false
+	case problem.Status == http.StatusRequestTimeout:
+		// CairnPost's own 408 is a request it never had whole. One from
+		// something in between may come after the server took the email.
+		return problem.Name != ErrRequestIncomplete
 	case problem.Name == ErrRecipientSuppress:
 		// Refused now; but an id with it is an earlier try under the same
 		// key whose answer never came.

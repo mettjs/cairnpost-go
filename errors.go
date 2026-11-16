@@ -75,10 +75,10 @@ var known = map[string]bool{
 //     sent until the domain is set up with the mail provider.
 //   - 409 invalid_idempotent_request: the key was used for another email,
 //     which was sent. Do not retry.
-//   - 409 concurrent_idempotent_requests, 429, 503: nothing was sent. Try
-//     again, after RetryAfter when it is set.
-//   - 502 upstream_unknown, and any 5xx that is not CairnPost's own: the
-//     email may have gone. Try again with the same Idempotency-Key, and
+//   - 409 concurrent_idempotent_requests, 408 request_incomplete, 429,
+//     503: nothing was sent. Try again, after RetryAfter when it is set.
+//   - 502 upstream_unknown, and any 5xx or 408 that is not CairnPost's
+//     own: the email may have gone. Try again with the same Idempotency-Key, and
 //     only with it. MayHaveSent says which errors these are.
 type Error struct {
 	Status int
@@ -115,8 +115,9 @@ func (e *Error) Error() string {
 func (e *Error) Retryable() bool {
 	switch {
 	case e.Name == ErrIdempotentInFlight, e.Status == http.StatusTooManyRequests, e.Status == http.StatusRequestTimeout:
-		// The last is a request that did not arrive whole: nothing was
-		// done with it.
+		// The last is a request that did not arrive whole in time. Under
+		// CairnPost's own name nothing was done with it; MayHaveSent says
+		// what one from something in between leaves open.
 		return true
 	case e.Status == http.StatusConflict:
 		return false
