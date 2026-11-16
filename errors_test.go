@@ -24,6 +24,7 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 		{422, `{"name":"recipient_suppressed","message":"Suppressed.","id":"msg-9"}`, "", ErrRecipientSuppress, "msg-9", false, true},
 		{409, `{"name":"invalid_idempotent_request","message":"Used."}`, "", ErrIdempotentMismatch, "", false, false},
 		{409, `{"name":"concurrent_idempotent_requests","message":"In flight."}`, "7", ErrIdempotentInFlight, "", true, false},
+		{408, `{"name":"request_incomplete","message":"Not whole."}`, "", ErrRequestIncomplete, "", true, false},
 		{429, `{"name":"rate_limit_exceeded","message":"Limit.","id":"msg-2"}`, "30", ErrRateLimited, "msg-2", true, false},
 		{502, `{"name":"upstream_unknown","message":"Lost.","id":"msg-3"}`, "", ErrUpstreamUnknown, "msg-3", true, true},
 		{503, `{"name":"upstream_unavailable","message":"Down."}`, "", ErrUpstreamDown, "", true, false},

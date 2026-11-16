@@ -6,6 +6,14 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Fixed
+
+- A 408 `request_incomplete` (a request that did not arrive whole in time)
+  is now read as CairnPost's own answer: `Error.Name` is
+  `ErrRequestIncomplete` and `Error.Message` the server's sentence. Before,
+  the name was not known to the client, so both were empty; `Retryable`
+  already said to try again.
+
 ## [0.1.1] - 2026-11-15
 
 ### Added

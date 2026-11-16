@@ -33,10 +33,13 @@ const (
 	// method. The server is older or newer than this client.
 	ErrMethodNotAllowed = "method_not_allowed"
 	ErrTooLarge         = "request_too_large"
-	ErrRateLimited      = "rate_limit_exceeded"
-	ErrUpstreamUnknown  = "upstream_unknown"
-	ErrUpstreamDown     = "upstream_unavailable"
-	ErrUnavailable      = "unavailable"
+	// ErrRequestIncomplete: the request did not arrive whole in time.
+	// Nothing was done with it; try again.
+	ErrRequestIncomplete = "request_incomplete"
+	ErrRateLimited       = "rate_limit_exceeded"
+	ErrUpstreamUnknown   = "upstream_unknown"
+	ErrUpstreamDown      = "upstream_unavailable"
+	ErrUnavailable       = "unavailable"
 	// ErrNotScheduled: the email to cancel or move does not wait to be
 	// sent: it is being sent, was sent, or was cancelled.
 	ErrNotScheduled = "not_scheduled"
@@ -60,7 +63,7 @@ var known = map[string]bool{
 	ErrValidation: true, ErrRejectedByUpstream: true, ErrSenderDomainNotReady: true, ErrRecipientSuppress: true, ErrIdempotentMismatch: true,
 	ErrIdempotentInFlight: true, ErrMissingKey: true, ErrInvalidKey: true, ErrDomainNotAllowed: true,
 	ErrAdminKeyRequired: true, ErrNotFound: true, ErrRouteNotFound: true, ErrMethodNotAllowed: true,
-	ErrTooLarge: true, ErrRateLimited: true,
+	ErrTooLarge: true, ErrRequestIncomplete: true, ErrRateLimited: true,
 	ErrUpstreamUnknown: true, ErrUpstreamDown: true, ErrUnavailable: true, ErrInternal: true,
 	ErrNotStarted: true, ErrNotScheduled: true, ErrScheduleFull: true, ErrNameTaken: true, ErrChangedMeanwhile: true,
 }
