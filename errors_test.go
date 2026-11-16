@@ -20,6 +20,7 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 		retry, mayBeOut bool
 	}{
 		{422, `{"statusCode":422,"name":"validation_error","message":"The subject is missing."}`, "", ErrValidation, "", false, false},
+		{422, `{"statusCode":422,"name":"sender_domain_not_ready","message":"Not set up.","id":"msg-9"}`, "", ErrSenderDomainNotReady, "msg-9", false, false},
 		{422, `{"name":"recipient_suppressed","message":"Suppressed.","id":"msg-9"}`, "", ErrRecipientSuppress, "msg-9", false, true},
 		{409, `{"name":"invalid_idempotent_request","message":"Used."}`, "", ErrIdempotentMismatch, "", false, false},
 		{409, `{"name":"concurrent_idempotent_requests","message":"In flight."}`, "7", ErrIdempotentInFlight, "", true, false},
