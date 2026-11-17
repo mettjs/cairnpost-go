@@ -30,6 +30,9 @@ var errTooLarge = errors.New("the answer is larger than the client reads; see Wi
 // else is at that address, or stands in between.
 var errNotCairnPost = errors.New("the answer was not the JSON a CairnPost server gives")
 
+// mostOfARefusal is how much of an answer that is a refusal is read.
+const mostOfARefusal = 64 << 10
+
 // call is one request to make.
 type call struct {
 	method string
@@ -105,14 +108,26 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		return &TransportError{cause: err}
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(res.Body, c.most+1))
+	fine := res.StatusCode >= 200 && res.StatusCode <= 299
+	most := c.most
+	if !fine {
+		// Of a refusal only its few short fields are kept: no more of it
+		// is read than holds them.
+		most = min(most, mostOfARefusal)
+	}
+	raw, err := io.ReadAll(io.LimitReader(res.Body, most+1))
 	if err != nil {
 		return &TransportError{cause: err}
 	}
-	if int64(len(raw)) > c.most {
-		return &TransportError{cause: errTooLarge}
+	if int64(len(raw)) > most {
+		if fine {
+			return &TransportError{cause: errTooLarge}
+		}
+		// A refusal this long is not CairnPost's. Its status is still
+		// what was answered, and says more than "too large" would.
+		raw = nil
 	}
-	if res.StatusCode < 200 || res.StatusCode > 299 {
+	if !fine {
 		// A plain call's 503 is an answer to read (the server is up and
 		// says what is not); anything else it is refused with is an
 		// error like any other, a path that is not there above all.

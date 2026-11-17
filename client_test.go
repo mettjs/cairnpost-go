@@ -128,6 +128,25 @@ func TestAnAnswerTooLargeSaysSo(t *testing.T) {
 	}
 }
 
+// A refusal is known by its status, however long the page under it.
+func TestALongRefusalKeepsItsStatus(t *testing.T) {
+	page := "<html>" + strings.Repeat("x", 200<<10) + "</html>"
+	for _, most := range []int64{1024, 1 << 20} {
+		s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+			w.WriteHeader(404)
+			io.WriteString(w, page)
+		}}
+		srv := httptest.NewServer(s)
+		c, _ := New(srv.URL, "key", WithMaxAnswerBytes(most))
+		_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Text: "t"})
+		var problem *Error
+		if !errors.As(err, &problem) || problem.Status != 404 || problem.Name != "" || MayHaveSent(err) || !IsWrongAddress(err) {
+			t.Errorf("reading %d bytes: %v", most, err)
+		}
+		srv.Close()
+	}
+}
+
 // The client makes each call once. net/http would by itself send again a
 // request that carries an Idempotency-Key when a kept connection drops;
 // the first might still be sending, and the second be told "in flight".
