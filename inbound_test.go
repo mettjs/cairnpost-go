@@ -24,14 +24,14 @@ func TestAReceivedEmailIsReadWithWhatItSays(t *testing.T) {
 	if _, err := c.Received(ctx, "in-1"); err == nil {
 		t.Fatal("an empty answer was taken for an email")
 	}
-	s, c = serve(t, 200, `{"data":[{"id":"in-2","to":"help@mail.example.com","received_at":"2030-01-01T00:00:00Z"}],"next":"in-2"}`)
+	s, c = serve(t, 200, `{"data":[{"id":"in-2","to":"help@mail.example.com","received_at":"2030-01-01T00:00:00Z","kept_until":"2030-01-08T00:00:00Z"}],"next":"in-2"}`)
 	page, err := c.ReceivedList(ctx, ReceivedQuery{Limit: 1, After: "in-3"})
 	if err != nil || len(page.Data) != 1 || page.Data[0].Content != nil || page.Data[0].From != "" || page.Next != "in-2" ||
 		s.seen[0].query != "after=in-3&limit=1" {
 		t.Fatalf("%+v %v %+v", page, err, s.seen[0])
 	}
 	// Reading them all asks for the largest page a server gives.
-	s, c = serve(t, 200, `{"data":[{"id":"in-9","to":"help@mail.example.com","received_at":"2030-01-01T00:00:00Z"}]}`)
+	s, c = serve(t, 200, `{"data":[{"id":"in-9","to":"help@mail.example.com","received_at":"2030-01-01T00:00:00Z","kept_until":"2030-01-08T00:00:00Z"}]}`)
 	for in, err := range c.AllReceived(ctx) {
 		if err != nil || in.ID != "in-9" {
 			t.Fatalf("%+v %v", in, err)

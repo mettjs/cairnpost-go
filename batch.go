@@ -51,20 +51,7 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 		}
 		k.header = http.Header{"Idempotency-Key": {b.IdempotencyKey}}
 	}
-	var out struct {
-		Data []struct {
-			ID         string    `json:"id"`
-			Suppressed []string  `json:"suppressed"`
-			At         time.Time `json:"scheduled_at"`
-			Error      *struct {
-				Status  int    `json:"statusCode"`
-				Name    string `json:"name"`
-				Message string `json:"message"`
-				ID      string `json:"id"`
-				Wait    int    `json:"retry_after"`
-			} `json:"error"`
-		} `json:"data"`
-	}
+	var out batchAnswer
 	if err := c.do(ctx, k, &out); err != nil {
 		return nil, err
 	}
@@ -92,6 +79,26 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 	}
 	return results, nil
 }
+
+// batchAnswer is the answer to a batch: one item for each email.
+type batchAnswer struct {
+	Data []struct {
+		ID         string    `json:"id"`
+		Suppressed []string  `json:"suppressed"`
+		At         time.Time `json:"scheduled_at"`
+		Error      *struct {
+			Status  int    `json:"statusCode"`
+			Name    string `json:"name"`
+			Message string `json:"message"`
+			ID      string `json:"id"`
+			Wait    int    `json:"retry_after"`
+		} `json:"error"`
+	} `json:"data"`
+}
+
+// SendBatch holds each item to what it must say, having the emails to
+// hold them against.
+func (b *batchAnswer) whole() bool { return b.Data != nil }
 
 // Failed counts the emails of a batch that did not go.
 func Failed(results []BatchResult) int {

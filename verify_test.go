@@ -112,9 +112,14 @@ func TestWhatIsNotTheEndpointsIsRefused(t *testing.T) {
 	// Signed, about an email, and not saying which: refused, not handed
 	// on with nothing in it.
 	for name, body := range map[string]string{
-		"no data":                `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z"}`,
-		"a recipient not a list": `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":"a@example.org","bounce":{"type":"Permanent"}}}`,
-		"a bounce of no type":    `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"]}}`,
+		"no data":                       `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z"}`,
+		"a recipient not a list":        `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":"a@example.org","bounce":{"type":"Permanent"}}}`,
+		"a bounce of no type":           `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"],"created_at":"2030-01-01T00:00:00Z"}}`,
+		"a bounce of an empty type":     `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"],"created_at":"2030-01-01T00:00:00Z","bounce":{"type":""}}}`,
+		"no time the email was made at": `{"type":"email.delivered","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"]}}`,
+		"no time the email came at":     `{"type":"email.received","created_at":"2030-01-01T00:00:05Z","data":{"inbound_id":"i","to":["a@example.org"]}}`,
+		"no time it happened at":        `{"type":"email.delivered","data":{"email_id":"m","to":["a@example.org"],"created_at":"2030-01-01T00:00:00Z"}}`,
+		"a time that is null":           `{"type":"webhook.test","created_at":null}`,
 	} {
 		v.Tolerance = 0
 		if e, err := v.Verify(headers("webhook-", "p", at, signature(key, "p", at, body)), []byte(body)); !errors.Is(err, ErrPayload) || e != nil {
@@ -181,6 +186,23 @@ func TestASuppressionToldOnItsOwnIsRead(t *testing.T) {
 	for _, both := range []string{other + " " + signature(key, "dlv-1", at, body), signature(key, "dlv-1", at, body) + " " + other} {
 		if _, err := v.Verify(headers("svix-", "dlv-1", at, both), []byte(body)); err != nil {
 			t.Errorf("two signatures, one of them ours: %v", err)
+		}
+	}
+}
+
+// A newer server may tell of something this client has no name for. It
+// is the application's to ignore, not the verifier's to refuse.
+func TestATypeNotKnownIsPassedOn(t *testing.T) {
+	v := verifier(t)
+	for body, withEmail := range map[string]bool{
+		`{"type":"email.opened","created_at":"2030-01-01T00:00:05Z","data":{"link":"x"}}`:                            false,
+		`{"type":"email.opened","created_at":"2030-01-01T00:00:05Z"}`:                                                false,
+		`{"type":"email.opened","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"]}}`: true,
+		`{"type":"domain.verified","created_at":"2030-01-01T00:00:05Z","data":{"domain":"example.com"}}`:             false,
+	} {
+		e, err := v.Verify(headers("webhook-", "n", at, signature(key, "n", at, body)), []byte(body))
+		if err != nil || e == nil || (e.Email != nil) != withEmail || e.At.IsZero() {
+			t.Errorf("%s: %+v %v", body, e, err)
 		}
 	}
 }

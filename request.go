@@ -30,6 +30,11 @@ var errTooLarge = errors.New("the answer is larger than the client reads; see Wi
 // else is at that address, or stands in between.
 var errNotCairnPost = errors.New("the answer was not the JSON a CairnPost server gives")
 
+// mostOfARefusal is how much of an answer that is a refusal is read.
+// It is not an option: CairnPost's refusals are a few hundred bytes, and
+// nothing past its short fields is kept, so there is nothing to choose.
+const mostOfARefusal = 64 << 10
+
 // call is one request to make.
 type call struct {
 	method string
@@ -42,14 +47,16 @@ type call struct {
 	// any status.
 	plain bool
 	// file marks a route whose answer is a file's bytes, not JSON: out is
-	// a *[]byte.
+	// a *content.
 	file bool
 }
 
-// do makes a call and decodes a 2xx answer into out (nil to ignore it).
+// do makes a call and decodes a 2xx answer into out, which must then be
+// whole. With a nil out the answer must be CairnPost's "done" that says
+// nothing: a 204 without a body.
 // Any other status is an *Error. A failure to reach the server, or to read
 // its answer, is a *TransportError.
-func (c *Client) do(ctx context.Context, k call, out any) error {
+func (c *Client) do(ctx context.Context, k call, out answer) error {
 	u := *c.base
 	u.Path, u.RawPath = c.base.Path, c.base.EscapedPath()
 	for _, seg := range k.path {
@@ -100,14 +107,28 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		return &TransportError{cause: err}
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(res.Body, c.most+1))
+	fine := res.StatusCode >= 200 && res.StatusCode <= 299
+	most := c.most
+	if !fine {
+		// Of a refusal only its few short fields are kept: as much is
+		// read as holds them, whatever the limit on answers is. A limit
+		// smaller than CairnPost's own refusal would lose its name, and
+		// with it whether the email may have gone.
+		most = mostOfARefusal
+	}
+	raw, err := io.ReadAll(io.LimitReader(res.Body, most+1))
 	if err != nil {
 		return &TransportError{cause: err}
 	}
-	if int64(len(raw)) > c.most {
-		return &TransportError{cause: errTooLarge}
+	if int64(len(raw)) > most {
+		if fine {
+			return &TransportError{cause: errTooLarge}
+		}
+		// A refusal this long is not CairnPost's. Its status is still
+		// what was answered, and says more than "too large" would.
+		raw = nil
 	}
-	if res.StatusCode < 200 || res.StatusCode > 299 {
+	if !fine {
 		// A plain call's 503 is an answer to read (the server is up and
 		// says what is not); anything else it is refused with is an
 		// error like any other, a path that is not there above all.
@@ -116,6 +137,10 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		}
 	}
 	if out == nil {
+		// Anything else that answers 2xx here did not do what was asked.
+		if res.StatusCode != http.StatusNoContent || len(raw) != 0 {
+			return &TransportError{cause: errNotCairnPost}
+		}
 		return nil
 	}
 	if k.file {
@@ -123,10 +148,10 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		if res.Header.Get("Content-Type") != "application/octet-stream" {
 			return &TransportError{cause: errNotCairnPost}
 		}
-		*out.(*[]byte) = raw
+		*out.(*content) = raw
 		return nil
 	}
-	if err := json.Unmarshal(raw, out); err != nil {
+	if err := json.Unmarshal(raw, out); err != nil || !out.whole() {
 		// The answer's text is not quoted: it could hold an email's words.
 		return &TransportError{cause: errNotCairnPost}
 	}

@@ -3,6 +3,8 @@ package cairnpost
 import (
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -35,7 +37,13 @@ func TestAnEmailAskedForLaterWaits(t *testing.T) {
 }
 
 func TestAWaitingEmailIsCancelledAndMoved(t *testing.T) {
-	s, c := serve(t, 200, `{"id":"msg-1","state":"cancelled"}`)
+	s, c := serving(t, func(w http.ResponseWriter, n int) {
+		if n == 1 {
+			io.WriteString(w, `{"id":"a/b","state":"cancelled"}`)
+			return
+		}
+		io.WriteString(w, `{"id":"msg-1","scheduled_at":"2030-01-31T08:00:00Z"}`)
+	})
 	if err := c.Cancel(ctx, "a/b"); err != nil || s.seen[0].method != "POST" || s.seen[0].rawPath != "/emails/a%2Fb/cancel" {
 		t.Fatalf("%v %+v", err, s.seen[0])
 	}

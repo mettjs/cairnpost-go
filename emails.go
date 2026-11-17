@@ -37,7 +37,9 @@ type Email struct {
 	ScheduledAt time.Time
 	// IdempotencyKey makes a repeated send one email: the same key with
 	// the same content answers the first one's id. Use one for anything
-	// that may be retried. It is remembered for a day by default.
+	// that may be retried. It is remembered for a day by default. An
+	// empty key is no key: check that yours is not empty when it is made
+	// from other values.
 	IdempotencyKey string
 }
 
@@ -115,23 +117,29 @@ func (c *Client) Send(ctx context.Context, e Email) (*Sent, error) {
 		}
 		k.header = http.Header{"Idempotency-Key": {e.IdempotencyKey}}
 	}
-	var out struct {
-		ID          string    `json:"id"`
-		Suppressed  []string  `json:"suppressed"`
-		ScheduledAt time.Time `json:"scheduled_at"`
-	}
+	var out sentAnswer
 	if err := c.do(ctx, k, &out); err != nil {
 		return nil, err
 	}
-	if out.ID == "" || out.ScheduledAt.IsZero() != e.ScheduledAt.IsZero() {
-		// A 2xx with no id is not CairnPost's answer: whatever is at that
-		// address, the email is not known to have been sent. Nor is one
-		// that does not say an email asked for later waits: a server too
-		// old to know the field would have refused it.
+	if out.ScheduledAt.IsZero() != e.ScheduledAt.IsZero() {
+		// An answer that does not say an email asked for later waits is
+		// not CairnPost's: a server too old to know the field would have
+		// refused it.
 		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &Sent{ID: out.ID, Suppressed: out.Suppressed, ScheduledAt: out.ScheduledAt}, nil
 }
+
+// sentAnswer is the answer to a send.
+type sentAnswer struct {
+	ID          string    `json:"id"`
+	Suppressed  []string  `json:"suppressed"`
+	ScheduledAt time.Time `json:"scheduled_at"`
+}
+
+// A 2xx with no id is not CairnPost's answer: whatever is at that
+// address, the email is not known to have been sent.
+func (s *sentAnswer) whole() bool { return s.ID != "" }
 
 // States of an email.
 const (
@@ -258,9 +266,6 @@ func (c *Client) Get(ctx context.Context, id string) (*Message, error) {
 	var m Message
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"emails", id}}, &m); err != nil {
 		return nil, err
-	}
-	if m.ID == "" {
-		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &m, nil
 }

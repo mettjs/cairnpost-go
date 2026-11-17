@@ -70,9 +70,6 @@ func (c *Client) template(ctx context.Context, k call) (*Template, error) {
 	if err := c.do(ctx, k, &t); err != nil {
 		return nil, err
 	}
-	if t.ID == "" {
-		return nil, &TransportError{cause: errNotCairnPost}
-	}
 	return &t, nil
 }
 

@@ -35,13 +35,13 @@ func TestWebhooksAndDeliveries(t *testing.T) {
 		switch n {
 		case 1:
 			w.WriteHeader(201)
-			io.WriteString(w, `{"id":"w1","url":"https://example.com/hook","events":["email.bounced"],"enabled":true,"secret":"whsec_c2VjcmV0"}`)
+			io.WriteString(w, `{"id":"w1","url":"https://example.com/hook","events":["email.bounced"],"enabled":true,"created_at":"2030-01-01T00:00:00Z","secret":"whsec_c2VjcmV0"}`)
 		case 2:
-			io.WriteString(w, `{"data":[{"id":"w1","url":"https://example.com/hook","events":[],"enabled":true}]}`)
+			io.WriteString(w, `{"data":[{"id":"w1","url":"https://example.com/hook","events":[],"enabled":true,"created_at":"2030-01-01T00:00:00Z"}]}`)
 		case 3:
-			io.WriteString(w, `{"data":[{"id":"d2","email_id":"m","type":"email.bounced","state":"failed","attempts":8,"last_status":500,"last_failure":"status"}],"next":"d2"}`)
+			io.WriteString(w, `{"data":[{"id":"d2","email_id":"m","type":"email.bounced","state":"failed","attempts":8,"last_status":500,"last_failure":"status","created_at":"2030-01-01T00:00:00Z"}],"next":"d2"}`)
 		case 4:
-			io.WriteString(w, `{"data":[{"id":"d1","email_id":"m","type":"email.delivered","state":"failed","attempts":8,"last_failure":"timeout"}]}`)
+			io.WriteString(w, `{"data":[{"id":"d1","email_id":"m","type":"email.delivered","state":"failed","attempts":8,"last_failure":"timeout","created_at":"2030-01-01T00:00:00Z"}]}`)
 		case 5:
 			io.WriteString(w, `{"state":"pending"}`)
 		case 6:

@@ -28,6 +28,9 @@ func TestAnErrorSaysWhatToDo(t *testing.T) {
 		{409, `{"name":"invalid_idempotent_request","message":"Used."}`, "", ErrIdempotentMismatch, "", false, false},
 		{409, `{"name":"concurrent_idempotent_requests","message":"In flight."}`, "7", ErrIdempotentInFlight, "", true, false},
 		{408, `{"name":"request_incomplete","message":"Not whole."}`, "", ErrRequestIncomplete, "", true, false},
+		// Changed by others meanwhile: nothing was done, and a second try may be.
+		{409, `{"name":"changed_meanwhile","message":"Changed."}`, "", ErrChangedMeanwhile, "", true, false},
+		{409, `{"name":"name_taken","message":"Taken."}`, "", ErrNameTaken, "", false, false},
 		// A 408 from something in between may come after the server took it.
 		{408, `<html>request timeout</html>`, "", "", "", true, true},
 		{429, `{"name":"rate_limit_exceeded","message":"Limit.","id":"msg-2"}`, "30", ErrRateLimited, "msg-2", true, false},

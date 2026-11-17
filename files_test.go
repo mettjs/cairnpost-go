@@ -39,7 +39,7 @@ func TestAFileThatIsNotKeptIsNotFound(t *testing.T) {
 }
 
 func TestContentSaysWhichFilesAreKept(t *testing.T) {
-	_, c := serve(t, 200, `{"id":"msg-1","state":"sent","content":{"subject":"s","attachments":[
+	_, c := serve(t, 200, `{"id":"msg-1","state":"sent","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z","content":{"subject":"s","kept_until":"2030-01-01T00:00:00Z","attachments":[
 		{"filename":"a.pdf","content_type":"application/pdf","size":3,"kept":true},
 		{"filename":"b.pdf","content_type":"application/pdf","size":4}]}}`)
 	m, err := c.Get(ctx, "msg-1")

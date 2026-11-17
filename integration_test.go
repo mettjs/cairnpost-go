@@ -13,8 +13,10 @@ import (
 
 // These tests run against a real CairnPost server: one started with the
 // capture driver and CAIRNPOST_WEBHOOK_ALLOW_PRIVATE=true, so that nothing
-// is sent to anybody and a webhook can reach this machine. They need its
-// address and two keys, and fail without them rather than skip.
+// is sent to anybody and a webhook can reach this machine, and with a
+// CAIRNPOST_INBOUND_SECRET, so that an email can be handed to it. They
+// need its address, two keys and that secret, and fail without them
+// rather than skip.
 func live(t *testing.T) (send, admin *Client) {
 	t.Helper()
 	base, sendKey, adminKey := os.Getenv("CAIRNPOST_URL"), os.Getenv("CAIRNPOST_SEND_KEY"), os.Getenv("CAIRNPOST_ADMIN_KEY")

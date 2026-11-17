@@ -26,7 +26,7 @@ func TestLimitsHealthAndCaptured(t *testing.T) {
 	if _, err := c.Health(ctx); err == nil {
 		t.Fatal("something that is not CairnPost was taken as healthy")
 	}
-	_, c = serve(t, 200, `{"data":[{"id":"c1","from":"app@example.com","to":["ana@example.org"],"cc":["bo@example.org"],"subject":"Hello","text":"Body"}]}`)
+	_, c = serve(t, 200, `{"data":[{"id":"c1","at":"2030-01-01T00:00:00Z","from":"app@example.com","to":["ana@example.org"],"cc":["bo@example.org"],"subject":"Hello","text":"Body"}]}`)
 	if held, err := c.Captured(ctx); err != nil || len(held) != 1 || held[0].Subject != "Hello" {
 		t.Fatalf("%+v %v", held, err)
 	}
@@ -69,5 +69,20 @@ func TestCapturedOfAServerThatDeliversForReal(t *testing.T) {
 	_, c = serve(t, 404, nothing)
 	if _, err := c.Captured(ctx); errors.Is(err, ErrNotCapturing) || !IsWrongAddress(err) {
 		t.Fatalf("a wrong base URL: %v", err)
+	}
+	// The server stopped answering between the two calls: that is what
+	// went wrong, not the address.
+	_, c = serving(t, func(w http.ResponseWriter, n int) {
+		if n == 1 {
+			w.WriteHeader(404)
+			io.WriteString(w, nothing)
+			return
+		}
+		w.WriteHeader(502)
+		io.WriteString(w, `<html>bad gateway</html>`)
+	})
+	var problem *Error
+	if _, err := c.Captured(ctx); errors.Is(err, ErrNotCapturing) || IsWrongAddress(err) || !errors.As(err, &problem) || problem.Status != 502 {
+		t.Fatalf("a server that went away: %v", err)
 	}
 }

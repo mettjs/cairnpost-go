@@ -88,5 +88,16 @@ func (c *Client) AllDeliveries(ctx context.Context, webhookID, state string) ite
 // RetryDelivery has a webhook tried now: once more if it was given up, or
 // without waiting for its next try if it is pending. Admin key.
 func (c *Client) RetryDelivery(ctx context.Context, webhookID, deliveryID string) error {
-	return c.do(ctx, call{method: http.MethodPost, path: []string{"webhooks", webhookID, "deliveries", deliveryID, "retry"}}, nil)
+	var out retriedAnswer
+	return c.do(ctx, call{method: http.MethodPost, path: []string{"webhooks", webhookID, "deliveries", deliveryID, "retry"}}, &out)
+}
+
+// retriedAnswer is the state of a webhook that will be tried now. Only
+// CairnPost's own word that it will counts.
+type retriedAnswer struct {
+	State string `json:"state"`
+}
+
+func (r *retriedAnswer) whole() bool {
+	return r.State == DeliveryPending
 }

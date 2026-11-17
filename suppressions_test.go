@@ -13,7 +13,7 @@ func TestSuppressionsArePagedAndWalked(t *testing.T) {
 		case 1:
 			io.WriteString(w, `{"data":[{"domain":"example.com","address":"a@example.org","reason":"bounce","email_id":"m1","created_at":"2030-01-01T00:00:00Z"}],"next":"cursor 1"}`)
 		default:
-			io.WriteString(w, `{"data":[{"domain":"example.com","address":"b@example.org","reason":"manual","note":"asked"}]}`)
+			io.WriteString(w, `{"data":[{"domain":"example.com","address":"b@example.org","reason":"manual","note":"asked","created_at":"2030-01-01T00:00:00Z"}]}`)
 		}
 	})
 	var got []string
@@ -52,6 +52,8 @@ func TestSuppressAndLift(t *testing.T) {
 			io.WriteString(w, `{"domain":"example.com","address":"a@example.org","added":true}`)
 		case 2:
 			io.WriteString(w, `{"domain":"example.com","address":"a@example.org","added":false}`)
+		case 3:
+			io.WriteString(w, `{"lifted":1}`)
 		default:
 			io.WriteString(w, `{"lifted":3}`)
 		}
@@ -86,7 +88,7 @@ func TestSuppressAndLift(t *testing.T) {
 
 // A cursor that does not move ends the walk, not the program.
 func TestAWalkStopsAtACursorThatDoesNotMove(t *testing.T) {
-	s, c := serve(t, 200, `{"data":[{"domain":"example.com","address":"a@example.org","reason":"manual"}],"next":"same"}`)
+	s, c := serve(t, 200, `{"data":[{"domain":"example.com","address":"a@example.org","reason":"manual","created_at":"2030-01-01T00:00:00Z"}],"next":"same"}`)
 	n := 0
 	for _, err := range c.AllSuppressions(ctx, "") {
 		if n++; err != nil || n > 5 {

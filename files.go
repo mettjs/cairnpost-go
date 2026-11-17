@@ -16,10 +16,10 @@ func (c *Client) FileContent(ctx context.Context, id string, place int) ([]byte,
 	if place < 1 {
 		return nil, errors.New("cairnpost: a file's place counts from 1")
 	}
-	var content []byte
+	var held content
 	k := call{method: http.MethodGet, path: []string{"emails", id, "attachments", strconv.Itoa(place)}, file: true}
-	if err := c.do(ctx, k, &content); err != nil {
+	if err := c.do(ctx, k, &held); err != nil {
 		return nil, err
 	}
-	return content, nil
+	return held, nil
 }

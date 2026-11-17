@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -66,7 +67,9 @@ func TestNewRefusesWhatCannotWork(t *testing.T) {
 }
 
 func TestABaseURLWithAPathIsKept(t *testing.T) {
-	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) { io.WriteString(w, `{"id":"m"}`) }}
+	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+		io.WriteString(w, `{"id":"m","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z"}`)
+	}}
 	srv := httptest.NewServer(s)
 	defer srv.Close()
 	c, err := New(srv.URL+"/mail/", "key", WithUserAgent("bad\nname"), WithUserAgent("billing/2"))
@@ -80,7 +83,9 @@ func TestABaseURLWithAPathIsKept(t *testing.T) {
 
 // A key read from a file ends in a newline: it is sent without it.
 func TestAKeyIsSentWithoutTheSpaceAroundIt(t *testing.T) {
-	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) { io.WriteString(w, `{"id":"m","state":"sent"}`) }}
+	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+		io.WriteString(w, `{"id":"m","state":"sent","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z"}`)
+	}}
 	srv := httptest.NewServer(s)
 	defer srv.Close()
 	c, err := New(srv.URL, " cp_test_KEY\n")
@@ -110,7 +115,7 @@ func TestARedirectIsNotFollowed(t *testing.T) {
 // An answer longer than the client reads is said to be that.
 func TestAnAnswerTooLargeSaysSo(t *testing.T) {
 	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
-		io.WriteString(w, `{"data":[{"id":"c1","subject":"`+strings.Repeat("x", 4096)+`"}]}`)
+		io.WriteString(w, `{"data":[{"id":"c1","at":"2030-01-01T00:00:00Z","subject":"`+strings.Repeat("x", 4096)+`"}]}`)
 	}}
 	srv := httptest.NewServer(s)
 	defer srv.Close()
@@ -122,6 +127,44 @@ func TestAnAnswerTooLargeSaysSo(t *testing.T) {
 	if held, err := roomy.Captured(ctx); err != nil || len(held) != 1 {
 		t.Fatalf("%v", err)
 	}
+	// The largest number there is means "no limit", not "nothing".
+	all, _ := New(srv.URL, "key", WithMaxAnswerBytes(math.MaxInt64))
+	if held, err := all.Captured(ctx); err != nil || len(held) != 1 {
+		t.Fatalf("%v", err)
+	}
+}
+
+// A refusal is known by its status, however long the page under it.
+func TestALongRefusalKeepsItsStatus(t *testing.T) {
+	page := "<html>" + strings.Repeat("x", 200<<10) + "</html>"
+	for _, most := range []int64{1024, 1 << 20} {
+		s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+			w.WriteHeader(404)
+			io.WriteString(w, page)
+		}}
+		srv := httptest.NewServer(s)
+		c, _ := New(srv.URL, "key", WithMaxAnswerBytes(most))
+		_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Text: "t"})
+		var problem *Error
+		if !errors.As(err, &problem) || problem.Status != 404 || problem.Name != "" || MayHaveSent(err) || !IsWrongAddress(err) {
+			t.Errorf("reading %d bytes: %v", most, err)
+		}
+		srv.Close()
+	}
+	// CairnPost's own refusal is read whole under a limit smaller than
+	// it: its name says whether the email may have gone.
+	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+		w.WriteHeader(422)
+		io.WriteString(w, `{"statusCode":422,"name":"recipient_suppressed","message":"`+strings.Repeat("Suppressed. ", 40)+`","id":"msg-1"}`)
+	}}
+	srv := httptest.NewServer(s)
+	defer srv.Close()
+	c, _ := New(srv.URL, "key", WithMaxAnswerBytes(100))
+	_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Text: "t"})
+	var problem *Error
+	if !errors.As(err, &problem) || problem.Name != ErrRecipientSuppress || problem.EmailID != "msg-1" || !MayHaveSent(err) {
+		t.Errorf("a refusal longer than the limit on answers: %v", err)
+	}
 }
 
 // The client makes each call once. net/http would by itself send again a
@@ -132,7 +175,7 @@ func TestASendIsMadeOnceEvenWhenTheConnectionDrops(t *testing.T) {
 		var posts atomic.Int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
-				io.WriteString(w, `{"status":"ok"}`) // leaves a connection to reuse
+				io.WriteString(w, `{"status":"ok","driver":"capture","version":"dev"}`) // leaves a connection to reuse
 				return
 			}
 			posts.Add(1)

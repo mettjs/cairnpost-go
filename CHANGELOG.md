@@ -6,6 +6,55 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Changed
+
+- `Verify` passes on a webhook whose type starts with `email.` and is
+  not one this client knows, even when it names no email: its
+  `Event.Email` is then nil. Before, it was refused with `ErrPayload`,
+  so a newer server's new type could not reach an older client. Check
+  `Event.Email` for nil before using it under a type you do not handle
+  by name.
+
+### Fixed
+
+- A refusal with a body longer than the client reads (a proxy's long
+  error page under `WithMaxAnswerBytes`) is the `*Error` with its status
+  that it is. It was a `*TransportError` saying the answer was too
+  large, which lost the status and read as "may have sent" even for a
+  404. 64 KiB of a refusal are read, whatever `WithMaxAnswerBytes`
+  says.
+- `WithMaxAnswerBytes(math.MaxInt64)`, as "no limit", made every answer
+  read as empty and so refused: a send that went came back as a
+  `*TransportError` with its id lost.
+- `Captured`, asked of a server without that path, answers the error
+  that says why when `Health` fails too. It answered "nothing at this
+  path" (a wrong base URL by `IsWrongAddress`) also when the server had
+  just stopped answering or the time ran out; that is now the
+  `*TransportError` it is, and a wrong address only when `Health` finds
+  one.
+- `Error.Retryable` is true of a 409 `changed_meanwhile`, which says to
+  read the template and try again. It answered false, as for the 409s
+  that must not be retried.
+- `Verify` refuses (`ErrPayload`) a webhook that does not say when it
+  happened, when its email was made or when its received email came,
+  and an `email.bounced` whose bounce names no type. They were handed
+  on with a zero time or an empty `Bounce.Type`.
+- A 2xx that does not say what CairnPost always says is no longer taken
+  for an answer. Something else at the address, or in between, can
+  answer 200 to anything, and `{}`, `null` or a field said as `null`
+  read as "done", "no" or "none": `Cancel`, `Reschedule`, `Lift`,
+  `RetryDelivery` and the three deletes succeeded, `Suppress` answered
+  "already suppressed", `LiftAll` answered 0, `TestWebhook` answered
+  "not delivered", and every list was empty. Each is now a
+  `*TransportError`. A delete is done only on a 204 without a body. A
+  record that does not say which it is and when it was made is refused,
+  alone or in a list. `Cancel` and `Reschedule` want the answer to name
+  the email asked about, `Lift` that one address was lifted,
+  `RetryDelivery` that the webhook is pending, `CreateWebhook` and
+  `RotateWebhookSecret` the secret they alone say, and `Health` the
+  driver and the version, so that another service's `{"status":"ok"}`
+  no longer passes for a CairnPost server.
+
 ## [0.1.2] - 2026-11-16
 
 ### Added

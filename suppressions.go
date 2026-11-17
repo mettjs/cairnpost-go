@@ -85,12 +85,28 @@ func (c *Client) Suppress(ctx context.Context, domain, address, note string) (ad
 		Address string `json:"address"`
 		Note    string `json:"note,omitempty"`
 	}{domain, address, note}
-	var out struct {
-		Added bool `json:"added"`
+	var out addedAnswer
+	if err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions"}, body: body}, &out); err != nil {
+		return false, err
 	}
-	err = c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions"}, body: body}, &out)
-	return out.Added, err
+	return *out.Added, nil
 }
+
+// addedAnswer says whether an address was put on the list just now. It
+// must say which: an answer that does not would read as "it was
+// suppressed already".
+type addedAnswer struct {
+	Added *bool `json:"added"`
+}
+
+func (a *addedAnswer) whole() bool { return a.Added != nil }
+
+// liftedAnswer says how many suppressions were lifted.
+type liftedAnswer struct {
+	Lifted *int `json:"lifted"`
+}
+
+func (l *liftedAnswer) whole() bool { return l.Lifted != nil && *l.Lifted >= 0 }
 
 // Lift lets an address be sent to again from a sending domain. IsNotFound
 // says it was not suppressed. Admin key.
@@ -99,7 +115,16 @@ func (c *Client) Lift(ctx context.Context, domain, address string) error {
 		Domain  string `json:"domain"`
 		Address string `json:"address"`
 	}{domain, address}
-	return c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, nil)
+	var out liftedAnswer
+	if err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, &out); err != nil {
+		return err
+	}
+	if *out.Lifted != 1 {
+		// CairnPost lifts the one address or says it was not suppressed:
+		// an answer of none, or of several, is not its own.
+		return &TransportError{cause: errNotCairnPost}
+	}
+	return nil
 }
 
 // LiftAll lifts every suppression of a sending domain, or those of one
@@ -110,11 +135,11 @@ func (c *Client) LiftAll(ctx context.Context, domain, reason string) (int, error
 		All    bool   `json:"all"`
 		Reason string `json:"reason,omitempty"`
 	}{domain, true, reason}
-	var out struct {
-		Lifted int `json:"lifted"`
+	var out liftedAnswer
+	if err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, &out); err != nil {
+		return 0, err
 	}
-	err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, &out)
-	return out.Lifted, err
+	return *out.Lifted, nil
 }
 
 // largestPage is the most a server gives in one page of any list: what
