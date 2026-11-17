@@ -31,6 +31,8 @@ var errTooLarge = errors.New("the answer is larger than the client reads; see Wi
 var errNotCairnPost = errors.New("the answer was not the JSON a CairnPost server gives")
 
 // mostOfARefusal is how much of an answer that is a refusal is read.
+// It is not an option: CairnPost's refusals are a few hundred bytes, and
+// nothing past its short fields is kept, so there is nothing to choose.
 const mostOfARefusal = 64 << 10
 
 // call is one request to make.
@@ -108,9 +110,11 @@ func (c *Client) do(ctx context.Context, k call, out answer) error {
 	fine := res.StatusCode >= 200 && res.StatusCode <= 299
 	most := c.most
 	if !fine {
-		// Of a refusal only its few short fields are kept: no more of it
-		// is read than holds them.
-		most = min(most, mostOfARefusal)
+		// Of a refusal only its few short fields are kept: as much is
+		// read as holds them, whatever the limit on answers is. A limit
+		// smaller than CairnPost's own refusal would lose its name, and
+		// with it whether the email may have gone.
+		most = mostOfARefusal
 	}
 	raw, err := io.ReadAll(io.LimitReader(res.Body, most+1))
 	if err != nil {

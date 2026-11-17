@@ -434,7 +434,7 @@ l, err := client.Limits(ctx) // l.Quota is nil for a provider with no allowance
 |---|---|
 | `WithHTTPClient(h)` | Call through your own `http.Client`. Keep its timeout above the server's send timeout, and do not let it follow redirects. |
 | `WithUserAgent(name)` | Put your application's name before the client's in `User-Agent`. |
-| `WithMaxAnswerBytes(n)` | How much of an answer is read (64 MiB by default). A larger one is an error that says so. |
+| `WithMaxAnswerBytes(n)` | How much of an answer is read (64 MiB by default). A larger one is an error that says so. A refusal is not counted: 64 KiB of one are read, and a longer one is its status alone. |
 
 ## Contributing
 

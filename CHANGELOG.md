@@ -21,7 +21,8 @@ Every change a user of this client can notice is written here. The format is
   error page under `WithMaxAnswerBytes`) is the `*Error` with its status
   that it is. It was a `*TransportError` saying the answer was too
   large, which lost the status and read as "may have sent" even for a
-  404. No more than 64 KiB of a refusal is read.
+  404. 64 KiB of a refusal are read, whatever `WithMaxAnswerBytes`
+  says.
 - `Captured`, asked of a server without that path, answers the error
   that says why when `Health` fails too. It answered "nothing at this
   path" (a wrong base URL by `IsWrongAddress`) also when the server had

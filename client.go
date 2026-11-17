@@ -58,7 +58,8 @@ func WithHTTPClient(h *http.Client) Option {
 }
 
 // WithMaxAnswerBytes sets how much of an answer is read. A larger answer
-// is an error that says so.
+// is an error that says so. It does not count for a refusal, of which
+// 64 KiB are read whatever this says: a longer one is its status alone.
 func WithMaxAnswerBytes(n int64) Option {
 	return func(c *Client) {
 		if n > 0 {

@@ -145,6 +145,20 @@ func TestALongRefusalKeepsItsStatus(t *testing.T) {
 		}
 		srv.Close()
 	}
+	// CairnPost's own refusal is read whole under a limit smaller than
+	// it: its name says whether the email may have gone.
+	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+		w.WriteHeader(422)
+		io.WriteString(w, `{"statusCode":422,"name":"recipient_suppressed","message":"`+strings.Repeat("Suppressed. ", 40)+`","id":"msg-1"}`)
+	}}
+	srv := httptest.NewServer(s)
+	defer srv.Close()
+	c, _ := New(srv.URL, "key", WithMaxAnswerBytes(100))
+	_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Text: "t"})
+	var problem *Error
+	if !errors.As(err, &problem) || problem.Name != ErrRecipientSuppress || problem.EmailID != "msg-1" || !MayHaveSent(err) {
+		t.Errorf("a refusal longer than the limit on answers: %v", err)
+	}
 }
 
 // The client makes each call once. net/http would by itself send again a
