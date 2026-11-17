@@ -17,6 +17,9 @@ Every change a user of this client can notice is written here. The format is
 
 ### Fixed
 
+- `Error.Retryable` is true of a 409 `changed_meanwhile`, which says to
+  read the template and try again. It answered false, as for the 409s
+  that must not be retried.
 - `Verify` refuses (`ErrPayload`) a webhook that does not say when it
   happened, and an `email.bounced` whose bounce names no type. Both
   were handed on with a zero `Event.At` or an empty `Bounce.Type`.

@@ -77,6 +77,7 @@ var known = map[string]bool{
 //     which was sent. Do not retry.
 //   - 409 concurrent_idempotent_requests, 408 request_incomplete, 429,
 //     503: nothing was sent. Try again, after RetryAfter when it is set.
+//   - 409 changed_meanwhile: nothing was changed. Read it and try again.
 //   - 502 upstream_unknown, and any 5xx or 408 that is not CairnPost's
 //     own: the email may have gone. Try again with the same Idempotency-Key, and
 //     only with it. MayHaveSent says which errors these are.
@@ -118,6 +119,9 @@ func (e *Error) Retryable() bool {
 		// The last is a request that did not arrive whole in time. Under
 		// CairnPost's own name nothing was done with it; MayHaveSent says
 		// what one from something in between leaves open.
+		return true
+	case e.Name == ErrChangedMeanwhile:
+		// Changed by others at the same time: read it and try again.
 		return true
 	case e.Status == http.StatusConflict:
 		return false

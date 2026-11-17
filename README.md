@@ -402,7 +402,7 @@ admin.LiftAll(ctx, "example.com", cairnpost.ReasonBounce)
 | `Suppressions`, `AllSuppressions` | The addresses not sent to, a page at a time or all of them. |
 | `Suppress`, `Lift`, `LiftAll` | Block an address for a sending domain, or let it be sent to again. |
 | `Received`, `ReceivedList`, `AllReceived`, `ReceivedRaw`, `ReceivedFile`, `DeleteReceived` | The emails that came for your addresses, while the server keeps them. |
-| `CreateTemplate`, `Templates`, `Template`, `UpdateTemplate`, `DeleteTemplate` | Manage the templates emails are sent from. `ErrNameTaken` for a name its domain has. |
+| `CreateTemplate`, `Templates`, `Template`, `UpdateTemplate`, `DeleteTemplate` | Manage the templates emails are sent from. `ErrNameTaken` for a name its domain has; `ErrChangedMeanwhile` (retryable) when others changed it at the same time. |
 | `FileContent` | What one of an email's files held, where the server keeps it (`File.Kept`). An admin key. |
 | `Captured` | The emails a development server (capture driver) kept instead of sending; `ErrNotCapturing` from a server that delivers for real. |
 
