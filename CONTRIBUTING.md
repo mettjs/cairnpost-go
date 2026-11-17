@@ -22,13 +22,17 @@ go test -race ./...
 
 The integration tests run against a real CairnPost server and are behind a
 build tag. Start a server with the capture driver, so nothing is sent to
-anybody, and with `CAIRNPOST_WEBHOOK_ALLOW_PRIVATE=true`, so its webhooks
-can reach your machine; make a send key and an admin key; then:
+anybody, with `CAIRNPOST_WEBHOOK_ALLOW_PRIVATE=true`, so its webhooks
+can reach your machine, and with a `CAIRNPOST_INBOUND_SECRET`, so the
+tests can hand it an email as a mail provider would
+(`CAIRNPOST_WEBHOOK_POLL=1s` keeps them short); make a send key and an
+admin key; then:
 
 ```sh
 export CAIRNPOST_URL=http://localhost:8025
 export CAIRNPOST_SEND_KEY=...
 export CAIRNPOST_ADMIN_KEY=...
+export CAIRNPOST_INBOUND_SECRET=...   # the one the server was started with
 go test -tags=integration -count=1 ./...
 ```
 
