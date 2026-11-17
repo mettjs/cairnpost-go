@@ -37,7 +37,9 @@ type Email struct {
 	ScheduledAt time.Time
 	// IdempotencyKey makes a repeated send one email: the same key with
 	// the same content answers the first one's id. Use one for anything
-	// that may be retried. It is remembered for a day by default.
+	// that may be retried. It is remembered for a day by default. An
+	// empty key is no key: check that yours is not empty when it is made
+	// from other values.
 	IdempotencyKey string
 }
 

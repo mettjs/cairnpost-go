@@ -70,7 +70,9 @@ error when nobody in `To` or `Cc` is left: a `Bcc` alone is not sent.
 
 **Use an `IdempotencyKey` for anything you may retry.** The same key with
 the same content, sent again, is the same email: the retry answers the
-first one's id and sends nothing.
+first one's id and sends nothing. An empty key is no key at all, and the
+send is then not idempotent: make sure yours is not empty when it is put
+together from other values.
 
 Several emails go in one request with `SendBatch`:
 
