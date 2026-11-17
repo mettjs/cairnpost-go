@@ -30,7 +30,7 @@ type Limits struct {
 // knows before it runs out.
 func (c *Client) Limits(ctx context.Context) (*Limits, error) {
 	var l Limits
-	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"limits"}}, &l); err != nil {
+	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"limits"}, must: []string{"driver"}}, &l); err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -108,7 +108,10 @@ func (c *Client) Captured(ctx context.Context) ([]CapturedEmail, error) {
 	var out struct {
 		Data []CapturedEmail `json:"data"`
 	}
-	err := c.do(ctx, call{method: http.MethodGet, path: []string{"capture", "emails"}}, &out)
+	err := c.do(ctx, call{method: http.MethodGet, path: []string{"capture", "emails"}, must: []string{"data"}}, &out)
+	if err == nil && !each(out.Data, (*CapturedEmail).whole) {
+		return nil, &TransportError{cause: errNotCairnPost}
+	}
 	var problem *Error
 	if errors.As(err, &problem) && problem.Name == ErrRouteNotFound {
 		// The path is not there. If the server is, it is one that does

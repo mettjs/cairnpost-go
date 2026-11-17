@@ -66,7 +66,9 @@ func TestNewRefusesWhatCannotWork(t *testing.T) {
 }
 
 func TestABaseURLWithAPathIsKept(t *testing.T) {
-	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) { io.WriteString(w, `{"id":"m"}`) }}
+	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+		io.WriteString(w, `{"id":"m","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z"}`)
+	}}
 	srv := httptest.NewServer(s)
 	defer srv.Close()
 	c, err := New(srv.URL+"/mail/", "key", WithUserAgent("bad\nname"), WithUserAgent("billing/2"))
@@ -80,7 +82,9 @@ func TestABaseURLWithAPathIsKept(t *testing.T) {
 
 // A key read from a file ends in a newline: it is sent without it.
 func TestAKeyIsSentWithoutTheSpaceAroundIt(t *testing.T) {
-	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) { io.WriteString(w, `{"id":"m","state":"sent"}`) }}
+	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
+		io.WriteString(w, `{"id":"m","state":"sent","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z"}`)
+	}}
 	srv := httptest.NewServer(s)
 	defer srv.Close()
 	c, err := New(srv.URL, " cp_test_KEY\n")
@@ -110,7 +114,7 @@ func TestARedirectIsNotFollowed(t *testing.T) {
 // An answer longer than the client reads is said to be that.
 func TestAnAnswerTooLargeSaysSo(t *testing.T) {
 	s := &stand{t: t, answer: func(w http.ResponseWriter, _ int) {
-		io.WriteString(w, `{"data":[{"id":"c1","subject":"`+strings.Repeat("x", 4096)+`"}]}`)
+		io.WriteString(w, `{"data":[{"id":"c1","at":"2030-01-01T00:00:00Z","subject":"`+strings.Repeat("x", 4096)+`"}]}`)
 	}}
 	srv := httptest.NewServer(s)
 	defer srv.Close()

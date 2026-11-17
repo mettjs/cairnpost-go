@@ -101,9 +101,9 @@ func TestAnEmailToSeveralNamesEachAndSaysWhoWasLeftOut(t *testing.T) {
 }
 
 func TestGetReadsEachAddressOfAnEmail(t *testing.T) {
-	_, c := serve(t, 200, `{"id":"m","from":"a@example.com","to":"ana@example.org","state":"delivered",
-		"recipients":[{"address":"ana@example.org","kind":"to","state":"delivered"},{"address":"bo@example.org","kind":"bcc","state":"bounced"}],
-		"events":[{"type":"bounced","to":"bo@example.org","permanent":true}]}`)
+	_, c := serve(t, 200, `{"id":"m","from":"a@example.com","to":"ana@example.org","state":"delivered","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z",
+		"recipients":[{"address":"ana@example.org","kind":"to","state":"delivered","updated_at":"2030-01-01T00:00:00Z"},{"address":"bo@example.org","kind":"bcc","state":"bounced","updated_at":"2030-01-01T00:00:00Z"}],
+		"events":[{"type":"bounced","at":"2030-01-01T00:00:00Z","to":"bo@example.org","permanent":true}]}`)
 	m, err := c.Get(ctx, "m")
 	if err != nil || len(m.Recipients) != 2 || m.Recipients[1].Kind != KindBcc || m.Recipients[1].State != StateBounced ||
 		len(m.Events) != 1 || m.Events[0].To != "bo@example.org" {
@@ -132,7 +132,7 @@ func TestFilesGoInBase64AndTheirDescriptionIsRead(t *testing.T) {
 		strings.Contains(s.seen[1].body, "attachments") {
 		t.Fatalf("%v %s", err, s.seen[1].body)
 	}
-	_, c = serve(t, 200, `{"id":"m","content":{"subject":"s","attachments":[{"filename":"invoice.pdf","content_type":"application/pdf","size":6}]}}`)
+	_, c = serve(t, 200, `{"id":"m","created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z","content":{"subject":"s","kept_until":"2030-01-01T00:00:00Z","attachments":[{"filename":"invoice.pdf","content_type":"application/pdf","size":6}]}}`)
 	m, err := c.Get(ctx, "m")
 	if err != nil || m.Content == nil || len(m.Content.Attachments) != 1 || m.Content.Attachments[0] != (File{Filename: "invoice.pdf", ContentType: "application/pdf", Size: 6}) {
 		t.Fatalf("%+v %v", m, err)

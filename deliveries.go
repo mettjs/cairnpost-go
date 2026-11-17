@@ -65,9 +65,12 @@ func (c *Client) Deliveries(ctx context.Context, webhookID string, q DeliveryQue
 	if q.State != "" {
 		query.Set("state", q.State)
 	}
-	k := call{method: http.MethodGet, path: []string{"webhooks", webhookID, "deliveries"}, query: query}
+	k := call{method: http.MethodGet, path: []string{"webhooks", webhookID, "deliveries"}, query: query, must: []string{"data"}}
 	if err := c.do(ctx, k, &page); err != nil {
 		return nil, err
+	}
+	if !each(page.Data, (*Delivery).whole) {
+		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &page, nil
 }
@@ -88,5 +91,16 @@ func (c *Client) AllDeliveries(ctx context.Context, webhookID, state string) ite
 // RetryDelivery has a webhook tried now: once more if it was given up, or
 // without waiting for its next try if it is pending. Admin key.
 func (c *Client) RetryDelivery(ctx context.Context, webhookID, deliveryID string) error {
-	return c.do(ctx, call{method: http.MethodPost, path: []string{"webhooks", webhookID, "deliveries", deliveryID, "retry"}}, nil)
+	var out struct {
+		State string `json:"state"`
+	}
+	k := call{method: http.MethodPost, path: []string{"webhooks", webhookID, "deliveries", deliveryID, "retry"}}
+	if err := c.do(ctx, k, &out); err != nil {
+		return err
+	}
+	if out.State == "" {
+		// Only CairnPost's own word that it will be tried counts.
+		return &TransportError{cause: errNotCairnPost}
+	}
+	return nil
 }

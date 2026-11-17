@@ -6,6 +6,19 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Fixed
+
+- A 2xx that does not say what CairnPost always says is no longer taken
+  for an answer. Something else at the address, or in between, can
+  answer 200 to anything, and `{}`, `null` or a field said as `null`
+  read as "done", "no" or "none": `Cancel`, `Reschedule`, `Lift`,
+  `RetryDelivery` and the three deletes succeeded, `Suppress` answered
+  "already suppressed", `LiftAll` answered 0, `TestWebhook` answered
+  "not delivered", and every list was empty. Each is now a
+  `*TransportError`. A delete is done only on a 204 without a body, and
+  a record that does not say when it was made is refused, alone or in a
+  list.
+
 ## [0.1.2] - 2026-11-16
 
 ### Added

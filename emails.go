@@ -259,7 +259,7 @@ func (c *Client) Get(ctx context.Context, id string) (*Message, error) {
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"emails", id}}, &m); err != nil {
 		return nil, err
 	}
-	if m.ID == "" {
+	if !m.whole() {
 		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &m, nil

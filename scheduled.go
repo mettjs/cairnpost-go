@@ -15,7 +15,22 @@ import (
 // An email that no longer waits (it is being sent, was sent or was
 // cancelled) answers an *Error named ErrNotScheduled.
 func (c *Client) Cancel(ctx context.Context, id string) error {
-	return c.do(ctx, call{method: http.MethodPost, path: []string{"emails", id, "cancel"}}, nil)
+	return c.moved(ctx, call{method: http.MethodPost, path: []string{"emails", id, "cancel"}})
+}
+
+// moved makes a call that answers the id of the email it changed. Only
+// CairnPost's own word that it did counts.
+func (c *Client) moved(ctx context.Context, k call) error {
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := c.do(ctx, k, &out); err != nil {
+		return err
+	}
+	if out.ID == "" {
+		return &TransportError{cause: errNotCairnPost}
+	}
+	return nil
 }
 
 // Reschedule gives an email that waits another time to be sent at. Its
@@ -28,5 +43,5 @@ func (c *Client) Reschedule(ctx context.Context, id string, at time.Time) error 
 	body := struct {
 		ScheduledAt time.Time `json:"scheduled_at"`
 	}{at.UTC().Round(0)}
-	return c.do(ctx, call{method: http.MethodPatch, path: []string{"emails", id}, body: body}, nil)
+	return c.moved(ctx, call{method: http.MethodPatch, path: []string{"emails", id}, body: body})
 }

@@ -70,7 +70,7 @@ func (c *Client) template(ctx context.Context, k call) (*Template, error) {
 	if err := c.do(ctx, k, &t); err != nil {
 		return nil, err
 	}
-	if t.ID == "" {
+	if t.ID == "" || !t.whole() {
 		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &t, nil
@@ -88,13 +88,16 @@ type TemplateList struct {
 // and name: its own domain's if it is bound to one; otherwise those of
 // the domain given, or all for "". Admin key.
 func (c *Client) Templates(ctx context.Context, domain string) (*TemplateList, error) {
-	k := call{method: http.MethodGet, path: []string{"templates"}}
+	k := call{method: http.MethodGet, path: []string{"templates"}, must: []string{"data"}}
 	if domain != "" {
 		k.query = url.Values{"domain": {domain}}
 	}
 	var out TemplateList
 	if err := c.do(ctx, k, &out); err != nil {
 		return nil, err
+	}
+	if !each(out.Data, (*Template).whole) {
+		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &out, nil
 }

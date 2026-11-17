@@ -55,7 +55,7 @@ func (c *Client) endpoint(ctx context.Context, k call) (*Webhook, error) {
 	if err := c.do(ctx, k, &w); err != nil {
 		return nil, err
 	}
-	if w.ID == "" {
+	if w.ID == "" || !w.whole() {
 		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &w, nil
@@ -66,8 +66,13 @@ func (c *Client) Webhooks(ctx context.Context) ([]Webhook, error) {
 	var out struct {
 		Data []Webhook `json:"data"`
 	}
-	err := c.do(ctx, call{method: http.MethodGet, path: []string{"webhooks"}}, &out)
-	return out.Data, err
+	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"webhooks"}, must: []string{"data"}}, &out); err != nil {
+		return nil, err
+	}
+	if !each(out.Data, (*Webhook).whole) {
+		return nil, &TransportError{cause: errNotCairnPost}
+	}
+	return out.Data, nil
 }
 
 // Webhook answers one endpoint. Admin key.
@@ -142,7 +147,8 @@ func (c *Client) ResumeWebhook(ctx context.Context, id string) (*Webhook, error)
 // now, and answers how it went. Admin key.
 func (c *Client) TestWebhook(ctx context.Context, id string) (*WebhookTest, error) {
 	var t WebhookTest
-	if err := c.do(ctx, call{method: http.MethodPost, path: []string{"webhooks", id, "test"}}, &t); err != nil {
+	k := call{method: http.MethodPost, path: []string{"webhooks", id, "test"}, must: []string{"delivered"}}
+	if err := c.do(ctx, k, &t); err != nil {
 		return nil, err
 	}
 	return &t, nil

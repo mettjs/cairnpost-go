@@ -77,8 +77,12 @@ type ReceivedPage struct {
 // all, or its sending domain's for a key bound to one. Admin key.
 func (c *Client) ReceivedList(ctx context.Context, q ReceivedQuery) (*ReceivedPage, error) {
 	var page ReceivedPage
-	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"inbound"}, query: paging(q.Limit, q.After)}, &page); err != nil {
+	k := call{method: http.MethodGet, path: []string{"inbound"}, query: paging(q.Limit, q.After), must: []string{"data"}}
+	if err := c.do(ctx, k, &page); err != nil {
 		return nil, err
+	}
+	if !each(page.Data, (*Received).whole) {
+		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &page, nil
 }
@@ -104,7 +108,7 @@ func (c *Client) Received(ctx context.Context, id string) (*Received, error) {
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"inbound", id}}, &r); err != nil {
 		return nil, err
 	}
-	if r.ID == "" {
+	if r.ID == "" || !r.whole() {
 		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &r, nil

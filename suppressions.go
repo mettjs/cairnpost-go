@@ -56,8 +56,12 @@ func (c *Client) Suppressions(ctx context.Context, q SuppressionQuery) (*Suppres
 	if q.Domain != "" {
 		query.Set("domain", q.Domain)
 	}
-	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"suppressions"}, query: query}, &page); err != nil {
+	k := call{method: http.MethodGet, path: []string{"suppressions"}, query: query, must: []string{"data"}}
+	if err := c.do(ctx, k, &page); err != nil {
 		return nil, err
+	}
+	if !each(page.Data, (*Suppression).whole) {
+		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &page, nil
 }
@@ -88,7 +92,9 @@ func (c *Client) Suppress(ctx context.Context, domain, address, note string) (ad
 	var out struct {
 		Added bool `json:"added"`
 	}
-	err = c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions"}, body: body}, &out)
+	// The answer must say which: one that does not would read as "it was
+	// suppressed already".
+	err = c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions"}, body: body, must: []string{"added"}}, &out)
 	return out.Added, err
 }
 
@@ -99,7 +105,10 @@ func (c *Client) Lift(ctx context.Context, domain, address string) error {
 		Domain  string `json:"domain"`
 		Address string `json:"address"`
 	}{domain, address}
-	return c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, nil)
+	var out struct {
+		Lifted int `json:"lifted"`
+	}
+	return c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body, must: []string{"lifted"}}, &out)
 }
 
 // LiftAll lifts every suppression of a sending domain, or those of one
@@ -113,7 +122,7 @@ func (c *Client) LiftAll(ctx context.Context, domain, reason string) (int, error
 	var out struct {
 		Lifted int `json:"lifted"`
 	}
-	err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body}, &out)
+	err := c.do(ctx, call{method: http.MethodPost, path: []string{"suppressions", "lift"}, body: body, must: []string{"lifted"}}, &out)
 	return out.Lifted, err
 }
 

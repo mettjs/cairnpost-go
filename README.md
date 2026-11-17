@@ -197,7 +197,7 @@ default:
 | `*Error`, 409 `concurrent_idempotent_requests`, 408 `request_incomplete`, 429, 503 | Nothing was sent. Try again, after `RetryAfter` when set. The 408 is a request that did not arrive whole in time, a 503 can be a server busy with other large emails. |
 | `*Error`, 502 `upstream_unknown` | The mail provider did not answer. The email may have gone. |
 | `*Error`, any other 5xx but the 503s above, or a 408 that is not CairnPost's own | The server failed after it began, or something in between answered for it (a proxy's 502 or 408). The email may have gone. |
-| `*TransportError` | The server was not reached, or its answer never came. For a send, the email may have gone. |
+| `*TransportError` | The server was not reached, its answer never came, or what answered 2xx was not CairnPost. For a send, the email may have gone. |
 
 `MayHaveSent` is true for the last three, and for a `recipient_suppressed`
 that carries an `EmailID`: nothing was sent now, but an earlier try under
@@ -211,6 +211,11 @@ does.
 `Error.EmailID`, when set, is the email's id on the server: `Get` says what
 became of it. No error holds the email's subject or body, or the API key;
 an answer that is not CairnPost's own is never quoted.
+
+A 2xx is believed only when it says what CairnPost always says there.
+Something else at the address, or in between, can answer 200 to anything:
+an empty object, a `null`, a page. That is a `*TransportError`, never
+"cancelled", "deleted", "not suppressed" or an empty list.
 
 The client does not follow redirects, which would turn a send into a
 request with no email in it: give `New` the server's own address. An API
