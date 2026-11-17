@@ -120,7 +120,7 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 		CreatedAt time.Time       `json:"created_at"`
 		Data      json.RawMessage `json:"data"`
 	}
-	if json.Unmarshal(body, &wire) != nil || wire.Type == "" {
+	if json.Unmarshal(body, &wire) != nil || wire.Type == "" || wire.CreatedAt.IsZero() {
 		return nil, ErrPayload
 	}
 	e := &Event{ID: id, Type: wire.Type, At: wire.CreatedAt}
@@ -144,7 +144,7 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 		// client does not know is passed on with what could be read.
 		return nil, ErrPayload
 	}
-	if e.Type == EventBounced && e.Email.Bounce == nil {
+	if e.Type == EventBounced && (e.Email.Bounce == nil || e.Email.Bounce.Type == "") {
 		return nil, ErrPayload
 	}
 	if e.Type == EventAddressSuppressed {

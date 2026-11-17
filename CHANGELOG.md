@@ -17,6 +17,9 @@ Every change a user of this client can notice is written here. The format is
 
 ### Fixed
 
+- `Verify` refuses (`ErrPayload`) a webhook that does not say when it
+  happened, and an `email.bounced` whose bounce names no type. Both
+  were handed on with a zero `Event.At` or an empty `Bounce.Type`.
 - A 2xx that does not say what CairnPost always says is no longer taken
   for an answer. Something else at the address, or in between, can
   answer 200 to anything, and `{}`, `null` or a field said as `null`

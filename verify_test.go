@@ -112,9 +112,12 @@ func TestWhatIsNotTheEndpointsIsRefused(t *testing.T) {
 	// Signed, about an email, and not saying which: refused, not handed
 	// on with nothing in it.
 	for name, body := range map[string]string{
-		"no data":                `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z"}`,
-		"a recipient not a list": `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":"a@example.org","bounce":{"type":"Permanent"}}}`,
-		"a bounce of no type":    `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"]}}`,
+		"no data":                   `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z"}`,
+		"a recipient not a list":    `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":"a@example.org","bounce":{"type":"Permanent"}}}`,
+		"a bounce of no type":       `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"]}}`,
+		"a bounce of an empty type": `{"type":"email.bounced","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"],"bounce":{"type":""}}}`,
+		"no time it happened at":    `{"type":"email.delivered","data":{"email_id":"m","to":["a@example.org"]}}`,
+		"a time that is null":       `{"type":"webhook.test","created_at":null}`,
 	} {
 		v.Tolerance = 0
 		if e, err := v.Verify(headers("webhook-", "p", at, signature(key, "p", at, body)), []byte(body)); !errors.Is(err, ErrPayload) || e != nil {
