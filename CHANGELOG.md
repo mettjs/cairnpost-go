@@ -17,6 +17,12 @@ Every change a user of this client can notice is written here. The format is
 
 ### Fixed
 
+- `Captured`, asked of a server without that path, answers the error
+  that says why when `Health` fails too. It answered "nothing at this
+  path" (a wrong base URL by `IsWrongAddress`) also when the server had
+  just stopped answering or the time ran out; that is now the
+  `*TransportError` it is, and a wrong address only when `Health` finds
+  one.
 - `Error.Retryable` is true of a 409 `changed_meanwhile`, which says to
   read the template and try again. It answered false, as for the 409s
   that must not be retried.

@@ -102,8 +102,9 @@ var ErrNotCapturing = errors.New("cairnpost: the server delivers for real and ke
 // Captured answers the emails a server running the capture driver holds,
 // newest first: what would have been sent. For development and tests. A
 // server that delivers for real has no such list: the error is then
-// ErrNotCapturing (ask with errors.Is), unless Health fails too, in which
-// case the base URL is what is wrong. Admin key.
+// ErrNotCapturing (ask with errors.Is). If Health fails too, the error is
+// the one that says why: a wrong base URL (IsWrongAddress), or a server
+// that could not be reached. Admin key.
 func (c *Client) Captured(ctx context.Context) ([]CapturedEmail, error) {
 	var out struct {
 		Data []CapturedEmail `json:"data"`
@@ -115,9 +116,13 @@ func (c *Client) Captured(ctx context.Context) ([]CapturedEmail, error) {
 	var problem *Error
 	if errors.As(err, &problem) && problem.Name == ErrRouteNotFound {
 		// The path is not there. If the server is, it is one that does
-		// not capture; if it is not, that is the error to give.
-		if _, down := c.Health(ctx); down != nil {
+		// not capture; if nothing of CairnPost's is at that address, the
+		// first error says so. Health failing any other way (no answer,
+		// the time ran out) is its own error: the path was not the fault.
+		if _, down := c.Health(ctx); IsWrongAddress(down) {
 			return nil, err
+		} else if down != nil {
+			return nil, down
 		}
 		return nil, ErrNotCapturing
 	}

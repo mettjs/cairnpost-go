@@ -70,4 +70,19 @@ func TestCapturedOfAServerThatDeliversForReal(t *testing.T) {
 	if _, err := c.Captured(ctx); errors.Is(err, ErrNotCapturing) || !IsWrongAddress(err) {
 		t.Fatalf("a wrong base URL: %v", err)
 	}
+	// The server stopped answering between the two calls: that is what
+	// went wrong, not the address.
+	_, c = serving(t, func(w http.ResponseWriter, n int) {
+		if n == 1 {
+			w.WriteHeader(404)
+			io.WriteString(w, nothing)
+			return
+		}
+		w.WriteHeader(502)
+		io.WriteString(w, `<html>bad gateway</html>`)
+	})
+	var problem *Error
+	if _, err := c.Captured(ctx); errors.Is(err, ErrNotCapturing) || IsWrongAddress(err) || !errors.As(err, &problem) || problem.Status != 502 {
+		t.Fatalf("a server that went away: %v", err)
+	}
 }
