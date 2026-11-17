@@ -6,6 +6,8 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-17
+
 ### Changed
 
 - `Verify` passes on a webhook whose type starts with `email.` and is
@@ -132,7 +134,8 @@ Every change a user of this client can notice is written here. The format is
   delivers for real.
 - Options: `WithHTTPClient`, `WithUserAgent`, `WithMaxAnswerBytes`.
 
-[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mettjs/cairnpost-go/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/mettjs/cairnpost-go/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/mettjs/cairnpost-go/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mettjs/cairnpost-go/releases/tag/v0.1.0
