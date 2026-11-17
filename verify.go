@@ -127,7 +127,7 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	if e.Type == EventReceived {
 		// It is about an email that came, and must say which and for whom.
 		var r EventReceivedEmail
-		if json.Unmarshal(wire.Data, &r) != nil || r.ID == "" || len(r.To) == 0 {
+		if json.Unmarshal(wire.Data, &r) != nil || r.ID == "" || len(r.To) == 0 || r.ReceivedAt.IsZero() {
 			return nil, ErrPayload
 		}
 		e.Received = &r
@@ -136,11 +136,12 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	var email EventEmail
 	readable := json.Unmarshal(wire.Data, &email) == nil && email.ID != "" && len(email.To) > 0
 	switch {
-	case readable:
+	case readable && (!email.CreatedAt.IsZero() || !aboutAnEmail[wire.Type]):
 		e.Email = &email
 	case aboutAnEmail[wire.Type]:
-		// An event about an email must say which: one that does not is
-		// refused here, not handed on with nothing in it. A type this
+		// An event about an email must say which, and when that email
+		// was made: one that does not is refused here, not handed on
+		// with nothing in it or a time of zero. A type this
 		// client does not know is passed on with what could be read.
 		return nil, ErrPayload
 	}

@@ -36,8 +36,9 @@ Every change a user of this client can notice is written here. The format is
   read the template and try again. It answered false, as for the 409s
   that must not be retried.
 - `Verify` refuses (`ErrPayload`) a webhook that does not say when it
-  happened, and an `email.bounced` whose bounce names no type. Both
-  were handed on with a zero `Event.At` or an empty `Bounce.Type`.
+  happened, when its email was made or when its received email came,
+  and an `email.bounced` whose bounce names no type. They were handed
+  on with a zero time or an empty `Bounce.Type`.
 - A 2xx that does not say what CairnPost always says is no longer taken
   for an answer. Something else at the address, or in between, can
   answer 200 to anything, and `{}`, `null` or a field said as `null`
