@@ -6,6 +6,15 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Changed
+
+- `Verify` passes on a webhook whose type starts with `email.` and is
+  not one this client knows, even when it names no email: its
+  `Event.Email` is then nil. Before, it was refused with `ErrPayload`,
+  so a newer server's new type could not reach an older client. Check
+  `Event.Email` for nil before using it under a type you do not handle
+  by name.
+
 ### Fixed
 
 - A 2xx that does not say what CairnPost always says is no longer taken

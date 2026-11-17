@@ -62,9 +62,13 @@ func NewVerifier(secret string) (*Verifier, error) {
 // exactly as it arrived: read it once, verify, and only then decode. An
 // error means the request must not be trusted; answer it 400 or 401.
 //
-// In the Event answered, Email is set for every type that starts with
-// "email.", and Email.Bounce for email.bounced; Suppression is set for
-// address.suppressed; both are nil for webhook.test.
+// In the Event answered, Email is set for email.delivered,
+// email.delivery_delayed, email.bounced, email.complained and
+// email.failed, and Email.Bounce for email.bounced; Suppression is set
+// for address.suppressed and Received for email.received. A type this
+// client does not know is passed on with what could be read of it, which
+// may be no Email: check it for nil before a type that is not one of
+// these.
 //
 // CairnPost signs as Standard Webhooks and Svix do, and sends the headers
 // under both names; either set is accepted.
@@ -134,9 +138,10 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	switch {
 	case readable:
 		e.Email = &email
-	case strings.HasPrefix(wire.Type, "email."):
+	case aboutAnEmail[wire.Type]:
 		// An event about an email must say which: one that does not is
-		// refused here, not handed on with nothing in it.
+		// refused here, not handed on with nothing in it. A type this
+		// client does not know is passed on with what could be read.
 		return nil, ErrPayload
 	}
 	if e.Type == EventBounced && e.Email.Bounce == nil {
@@ -152,6 +157,11 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 		e.Suppression = &s
 	}
 	return e, nil
+}
+
+// aboutAnEmail are the types that tell of an email that was sent.
+var aboutAnEmail = map[string]bool{
+	EventDelivered: true, EventDeliveryDelays: true, EventBounced: true, EventComplained: true, EventFailed: true,
 }
 
 // signed reads the signature headers under whichever names they came.

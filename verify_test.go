@@ -184,3 +184,20 @@ func TestASuppressionToldOnItsOwnIsRead(t *testing.T) {
 		}
 	}
 }
+
+// A newer server may tell of something this client has no name for. It
+// is the application's to ignore, not the verifier's to refuse.
+func TestATypeNotKnownIsPassedOn(t *testing.T) {
+	v := verifier(t)
+	for body, withEmail := range map[string]bool{
+		`{"type":"email.opened","created_at":"2030-01-01T00:00:05Z","data":{"link":"x"}}`:                            false,
+		`{"type":"email.opened","created_at":"2030-01-01T00:00:05Z"}`:                                                false,
+		`{"type":"email.opened","created_at":"2030-01-01T00:00:05Z","data":{"email_id":"m","to":["a@example.org"]}}`: true,
+		`{"type":"domain.verified","created_at":"2030-01-01T00:00:05Z","data":{"domain":"example.com"}}`:             false,
+	} {
+		e, err := v.Verify(headers("webhook-", "n", at, signature(key, "n", at, body)), []byte(body))
+		if err != nil || e == nil || (e.Email != nil) != withEmail || e.At.IsZero() {
+			t.Errorf("%s: %+v %v", body, e, err)
+		}
+	}
+}

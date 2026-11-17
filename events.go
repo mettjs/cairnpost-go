@@ -46,7 +46,8 @@ type Event struct {
 	// receiver that may be sent one twice tells by this.
 	ID string `json:"id"`
 	// Type is one of the Event constants; a type this client does not
-	// know is passed through as it is.
+	// know is passed through as it is, with an Email only if it names
+	// one.
 	Type string `json:"type"`
 	// At is when the event happened.
 	At time.Time `json:"created_at"`

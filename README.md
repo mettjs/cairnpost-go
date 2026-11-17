@@ -296,10 +296,14 @@ http.HandleFunc("/webhooks/cairnpost", func(w http.ResponseWriter, r *http.Reque
   (`ErrStale`), which is what stops a captured webhook being replayed.
 - `event.ID` is the same on every try of a webhook. CairnPost retries one
   that was not answered with a 2xx, and may send one twice: act once per id.
-- `event.Email` is set for every type that starts with `email.`, and
-  `event.Email.Bounce` for `email.bounced`; a webhook that lacks them is
-  refused (`ErrPayload`). `event.Email` is nil for `webhook.test`, the
-  webhook sent to try an endpoint out.
+- `event.Email` is set for `email.delivered`, `email.delivery_delayed`,
+  `email.bounced`, `email.complained` and `email.failed`, and
+  `event.Email.Bounce` for `email.bounced`; a webhook of those types that
+  lacks them is refused (`ErrPayload`). `event.Email` is nil for
+  `webhook.test`, the webhook sent to try an endpoint out.
+- A type this client does not know (a newer server's) is passed on, with
+  an `event.Email` only if it names one: check it for nil in a `default`
+  case.
 - `event.Email.To` holds the one address the event is about, also when
   the email went to several; `event.Email.ID` is the email's one id.
 - `email.received` (`cairnpost.EventReceived`) tells of an email that
