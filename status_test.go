@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestLimitsHealthAndCaptured(t *testing.T) {
 		t.Fatalf("%+v %v", l, err)
 	}
 	// A server that is up with its database down is answered, not an error.
-	s, c := serve(t, 503, `{"status":"unavailable","driver":"capture","version":"dev","events":"off","webhooks":"sending","pruning":"failing"}`)
+	s, c := serve(t, 503, strings.NewReplacer(`"ok"`, `"unavailable"`, `"running"`, `"failing"`).Replace(up))
 	h, err := c.Health(ctx)
 	if err != nil || h.OK() || h.Pruning != "failing" || s.seen[0].auth != "" {
 		t.Fatalf("%+v %v, key sent: %q", h, err, s.seen[0].auth)
@@ -60,7 +61,7 @@ func TestCapturedOfAServerThatDeliversForReal(t *testing.T) {
 			io.WriteString(w, nothing)
 			return
 		}
-		io.WriteString(w, `{"status":"ok","driver":"cloudflare","version":"dev"}`)
+		io.WriteString(w, strings.Replace(up, "capture", "cloudflare", 1))
 	})
 	if held, err := c.Captured(ctx); !errors.Is(err, ErrNotCapturing) || held != nil || IsWrongAddress(err) ||
 		len(s.seen) != 2 || s.seen[1].path != "/health" {

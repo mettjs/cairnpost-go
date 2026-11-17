@@ -2,8 +2,11 @@ package cairnpost
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"maps"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,7 +94,7 @@ func TestNoCallTakesAnAnswerThatIsNotCairnPosts(t *testing.T) {
 // A record says when it was made: one that does not was not written by
 // CairnPost, alone or in a list.
 func TestARecordWithoutItsTimesIsRefused(t *testing.T) {
-	const body = `{"id":"x","data":[{"id":"x"}]}`
+	const body = `{"id":"x","more":false,"data":[{"id":"x"}]}`
 	for _, name := range []string{"Get", "Captured", "Suppressions", "CreateWebhook", "Webhooks", "Webhook", "UpdateWebhook",
 		"RotateWebhookSecret", "ResumeWebhook", "Deliveries", "CreateTemplate", "Templates", "Template", "UpdateTemplate",
 		"ReceivedList", "Received"} {
@@ -114,9 +117,8 @@ func TestAnAnswerAboutSomethingElseIsRefused(t *testing.T) {
 		"RetryDelivery":       `{"state":"error"}`,
 		"CreateWebhook":       `{"id":"w1",` + at + `}`,
 		"RotateWebhookSecret": `{"id":"w1",` + at + `}`,
-		"Health":              `{"status":"ok"}`,
 		"Webhooks":            `{"data":[{` + at + `}]}`,
-		"Templates":           `{"data":[{` + at + `}]}`,
+		"Templates":           `{"more":false,"data":[{` + at + `}]}`,
 		"ReceivedList":        `{"data":[{` + at + `}]}`,
 		"Deliveries":          `{"data":[{` + at + `}]}`,
 		"Suppressions":        `{"data":[{` + at + `}]}`,
@@ -125,6 +127,39 @@ func TestAnAnswerAboutSomethingElseIsRefused(t *testing.T) {
 		_, c := serve(t, 200, body)
 		if err := answering[name](ctx, c); !errors.Is(err, errNotCairnPost) {
 			t.Errorf("%s took %s: %v", name, body, err)
+		}
+	}
+	// Each of these lacks one thing only, or says one thing wrong.
+	for _, one := range [][2]string{
+		{"Cancel", `{"id":"m","state":"scheduled"}`},
+		{"Cancel", `{"id":"m"}`},
+		// The email's own record, which is at the path a move is asked
+		// at, and says the time it had.
+		{"Reschedule", `{"id":"m","state":"scheduled","scheduled_at":"2030-01-31T08:00:00Z",` + at + `}`},
+		{"Reschedule", `{"id":"m"}`},
+		{"Reschedule", `{"id":"m","scheduled_at":"0001-01-01T00:00:00Z"}`},
+		{"Health", strings.Replace(up, `"events":"off"`, `"events":""`, 1)},
+		{"Templates", `{"data":[]}`},
+		{"Suppressions", `{"data":[{"domain":"example.com","reason":"manual",` + at + `}]}`},
+		{"Suppressions", `{"data":[{"address":"a@example.org","reason":"manual",` + at + `}]}`},
+	} {
+		_, c := serve(t, 200, one[1])
+		if err := answering[one[0]](ctx, c); !errors.Is(err, errNotCairnPost) {
+			t.Errorf("%s took %s: %v", one[0], one[1], err)
+		}
+	}
+	// Health says each of its fields.
+	var said map[string]string
+	if err := json.Unmarshal([]byte(up), &said); err != nil || len(said) != 8 {
+		t.Fatalf("%d fields: %v", len(said), err)
+	}
+	for field := range said {
+		less := maps.Clone(said)
+		delete(less, field)
+		body, _ := json.Marshal(less)
+		_, c := serve(t, 200, string(body))
+		if _, err := c.Health(ctx); !errors.Is(err, errNotCairnPost) {
+			t.Errorf("health without its %s: %v", field, err)
 		}
 	}
 	// A value never comes with an error.
