@@ -53,6 +53,9 @@ func serving(t *testing.T, answer func(http.ResponseWriter, int)) (*stand, *Clie
 
 var ctx = context.Background()
 
+// up is what a server that is up says of itself.
+const up = `{"status":"ok","driver":"capture","version":"dev","events":"off","webhooks":"sending","pruning":"running","scheduled":"sending","inbound":"off"}`
+
 func TestNewRefusesWhatCannotWork(t *testing.T) {
 	for _, base := range []string{"", "mail.example.com", "ftp://mail.example.com", "https://"} {
 		if _, err := New(base, "key"); err == nil {
@@ -175,7 +178,7 @@ func TestASendIsMadeOnceEvenWhenTheConnectionDrops(t *testing.T) {
 		var posts atomic.Int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
-				io.WriteString(w, `{"status":"ok","driver":"capture","version":"dev"}`) // leaves a connection to reuse
+				io.WriteString(w, up) // leaves a connection to reuse
 				return
 			}
 			posts.Add(1)

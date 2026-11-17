@@ -68,9 +68,12 @@ func (s *Suppression) whole() bool {
 func (p *SuppressionPage) whole() bool { return listed(p.Data) }
 func (p *DeliveryPage) whole() bool    { return listed(p.Data) }
 func (p *ReceivedPage) whole() bool    { return listed(p.Data) }
-func (l *TemplateList) whole() bool    { return listed(l.Data) }
 
-// A server says what it sends with and which version it is; anything
-// else that answers "ok" at /health does not.
-func (h *Health) whole() bool { return h.Status != "" && h.Driver != "" && h.Version != "" }
+// A server says what it sends with, which version it is and how each of
+// its parts is doing; anything else that answers "ok" at /health does
+// not.
+func (h *Health) whole() bool {
+	return h.Status != "" && h.Driver != "" && h.Version != "" && h.Events != "" && h.Webhooks != "" &&
+		h.Pruning != "" && h.Scheduled != "" && h.Inbound != ""
+}
 func (l *Limits) whole() bool { return l.Driver != "" }

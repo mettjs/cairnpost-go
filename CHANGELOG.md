@@ -6,6 +6,18 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Fixed
+
+- `Cancel` is done only on an answer that says the email is cancelled,
+  and `Reschedule` on one that says the time asked for. Both took any
+  answer that named the email, so the email's own record, which is at
+  the path a move is asked at, read as "moved" while the email kept its
+  old time.
+- `Health` wants every field a server says of itself, and `Templates`
+  wants to be told whether there are more. Something else that answered
+  a status, a driver and a version passed for a server whose parts were
+  all unnamed, and a list that left `more` out read as complete.
+
 ## [0.2.0] - 2026-11-17
 
 ### Changed

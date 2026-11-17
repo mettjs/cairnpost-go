@@ -89,12 +89,22 @@ func (c *Client) Templates(ctx context.Context, domain string) (*TemplateList, e
 	if domain != "" {
 		k.query = url.Values{"domain": {domain}}
 	}
-	var out TemplateList
+	var out templatesAnswer
 	if err := c.do(ctx, k, &out); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &TemplateList{Data: out.Data, More: *out.More}, nil
 }
+
+// templatesAnswer is the answer to a list of templates. Whether there
+// are more is said either way: left out, it must not read as "these are
+// all".
+type templatesAnswer struct {
+	Data []Template `json:"data"`
+	More *bool      `json:"more"`
+}
+
+func (a *templatesAnswer) whole() bool { return listed(a.Data) && a.More != nil }
 
 // Template answers one template whole. IsNotFound says there is none,
 // or that it is another sending domain's. Admin key.
