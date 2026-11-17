@@ -52,6 +52,8 @@ func TestSuppressAndLift(t *testing.T) {
 			io.WriteString(w, `{"domain":"example.com","address":"a@example.org","added":true}`)
 		case 2:
 			io.WriteString(w, `{"domain":"example.com","address":"a@example.org","added":false}`)
+		case 3:
+			io.WriteString(w, `{"lifted":1}`)
 		default:
 			io.WriteString(w, `{"lifted":3}`)
 		}

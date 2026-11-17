@@ -155,7 +155,7 @@ func TestASendIsMadeOnceEvenWhenTheConnectionDrops(t *testing.T) {
 		var posts atomic.Int32
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet {
-				io.WriteString(w, `{"status":"ok"}`) // leaves a connection to reuse
+				io.WriteString(w, `{"status":"ok","driver":"capture","version":"dev"}`) // leaves a connection to reuse
 				return
 			}
 			posts.Add(1)

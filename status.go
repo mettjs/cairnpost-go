@@ -30,7 +30,7 @@ type Limits struct {
 // knows before it runs out.
 func (c *Client) Limits(ctx context.Context) (*Limits, error) {
 	var l Limits
-	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"limits"}, must: []string{"driver"}}, &l); err != nil {
+	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"limits"}}, &l); err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -70,9 +70,6 @@ func (c *Client) Health(ctx context.Context) (*Health, error) {
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"health"}, plain: true}, &h); err != nil {
 		return nil, err
 	}
-	if h.Status == "" {
-		return nil, &TransportError{cause: errNotCairnPost}
-	}
 	return &h, nil
 }
 
@@ -106,13 +103,8 @@ var ErrNotCapturing = errors.New("cairnpost: the server delivers for real and ke
 // the one that says why: a wrong base URL (IsWrongAddress), or a server
 // that could not be reached. Admin key.
 func (c *Client) Captured(ctx context.Context) ([]CapturedEmail, error) {
-	var out struct {
-		Data []CapturedEmail `json:"data"`
-	}
-	err := c.do(ctx, call{method: http.MethodGet, path: []string{"capture", "emails"}, must: []string{"data"}}, &out)
-	if err == nil && !each(out.Data, (*CapturedEmail).whole) {
-		return nil, &TransportError{cause: errNotCairnPost}
-	}
+	var out capturedAnswer
+	err := c.do(ctx, call{method: http.MethodGet, path: []string{"capture", "emails"}}, &out)
 	var problem *Error
 	if errors.As(err, &problem) && problem.Name == ErrRouteNotFound {
 		// The path is not there. If the server is, it is one that does
@@ -126,5 +118,15 @@ func (c *Client) Captured(ctx context.Context) ([]CapturedEmail, error) {
 		}
 		return nil, ErrNotCapturing
 	}
-	return out.Data, err
+	if err != nil {
+		return nil, err
+	}
+	return out.Data, nil
 }
+
+// capturedAnswer is the list of what a development server kept.
+type capturedAnswer struct {
+	Data []CapturedEmail `json:"data"`
+}
+
+func (a *capturedAnswer) whole() bool { return listed(a.Data) }

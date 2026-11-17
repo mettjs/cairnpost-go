@@ -77,12 +77,8 @@ type ReceivedPage struct {
 // all, or its sending domain's for a key bound to one. Admin key.
 func (c *Client) ReceivedList(ctx context.Context, q ReceivedQuery) (*ReceivedPage, error) {
 	var page ReceivedPage
-	k := call{method: http.MethodGet, path: []string{"inbound"}, query: paging(q.Limit, q.After), must: []string{"data"}}
-	if err := c.do(ctx, k, &page); err != nil {
+	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"inbound"}, query: paging(q.Limit, q.After)}, &page); err != nil {
 		return nil, err
-	}
-	if !each(page.Data, (*Received).whole) {
-		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return &page, nil
 }
@@ -108,16 +104,13 @@ func (c *Client) Received(ctx context.Context, id string) (*Received, error) {
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"inbound", id}}, &r); err != nil {
 		return nil, err
 	}
-	if r.ID == "" || !r.whole() {
-		return nil, &TransportError{cause: errNotCairnPost}
-	}
 	return &r, nil
 }
 
 // ReceivedRaw answers a received email as it came, every byte: what a
 // mail program opens. Admin key.
 func (c *Client) ReceivedRaw(ctx context.Context, id string) ([]byte, error) {
-	var raw []byte
+	var raw content
 	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"inbound", id, "raw"}, file: true}, &raw); err != nil {
 		return nil, err
 	}
@@ -131,12 +124,12 @@ func (c *Client) ReceivedFile(ctx context.Context, id string, place int) ([]byte
 	if place < 1 {
 		return nil, errors.New("cairnpost: a file's place counts from 1")
 	}
-	var content []byte
+	var held content
 	k := call{method: http.MethodGet, path: []string{"inbound", id, "attachments", strconv.Itoa(place)}, file: true}
-	if err := c.do(ctx, k, &content); err != nil {
+	if err := c.do(ctx, k, &held); err != nil {
 		return nil, err
 	}
-	return content, nil
+	return held, nil
 }
 
 // DeleteReceived deletes a received email before its time. Admin key.

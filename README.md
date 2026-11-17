@@ -216,8 +216,9 @@ an answer that is not CairnPost's own is never quoted.
 
 A 2xx is believed only when it says what CairnPost always says there.
 Something else at the address, or in between, can answer 200 to anything:
-an empty object, a `null`, a page. That is a `*TransportError`, never
-"cancelled", "deleted", "not suppressed" or an empty list.
+an empty object, a `null`, a page, its own `{"status":"ok"}`. That is a
+`*TransportError`, never "cancelled", "deleted", "not suppressed", an
+empty list or a healthy server.
 
 The client does not follow redirects, which would turn a send into a
 request with no email in it: give `New` the server's own address. An API

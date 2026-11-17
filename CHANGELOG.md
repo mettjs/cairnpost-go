@@ -41,9 +41,14 @@ Every change a user of this client can notice is written here. The format is
   `RetryDelivery` and the three deletes succeeded, `Suppress` answered
   "already suppressed", `LiftAll` answered 0, `TestWebhook` answered
   "not delivered", and every list was empty. Each is now a
-  `*TransportError`. A delete is done only on a 204 without a body, and
-  a record that does not say when it was made is refused, alone or in a
-  list.
+  `*TransportError`. A delete is done only on a 204 without a body. A
+  record that does not say which it is and when it was made is refused,
+  alone or in a list. `Cancel` and `Reschedule` want the answer to name
+  the email asked about, `Lift` that one address was lifted,
+  `RetryDelivery` that the webhook is pending, `CreateWebhook` and
+  `RotateWebhookSecret` the secret they alone say, and `Health` the
+  driver and the version, so that another service's `{"status":"ok"}`
+  no longer passes for a CairnPost server.
 
 ## [0.1.2] - 2026-11-16
 

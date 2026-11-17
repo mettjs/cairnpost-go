@@ -45,19 +45,16 @@ type call struct {
 	// any status.
 	plain bool
 	// file marks a route whose answer is a file's bytes, not JSON: out is
-	// a *[]byte.
+	// a *content.
 	file bool
-	// must are the fields the answer always says: one that lacks any, or
-	// says null for it, is not CairnPost's.
-	must []string
 }
 
-// do makes a call and decodes a 2xx answer into out. With a nil out the
-// answer must be CairnPost's "done" that says nothing: a 204 without a
-// body.
+// do makes a call and decodes a 2xx answer into out, which must then be
+// whole. With a nil out the answer must be CairnPost's "done" that says
+// nothing: a 204 without a body.
 // Any other status is an *Error. A failure to reach the server, or to read
 // its answer, is a *TransportError.
-func (c *Client) do(ctx context.Context, k call, out any) error {
+func (c *Client) do(ctx context.Context, k call, out answer) error {
 	u := *c.base
 	u.Path, u.RawPath = c.base.Path, c.base.EscapedPath()
 	for _, seg := range k.path {
@@ -147,10 +144,10 @@ func (c *Client) do(ctx context.Context, k call, out any) error {
 		if res.Header.Get("Content-Type") != "application/octet-stream" {
 			return &TransportError{cause: errNotCairnPost}
 		}
-		*out.(*[]byte) = raw
+		*out.(*content) = raw
 		return nil
 	}
-	if err := json.Unmarshal(raw, out); err != nil || !names(raw, k.must) {
+	if err := json.Unmarshal(raw, out); err != nil || !out.whole() {
 		// The answer's text is not quoted: it could hold an email's words.
 		return &TransportError{cause: errNotCairnPost}
 	}

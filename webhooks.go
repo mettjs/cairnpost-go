@@ -46,7 +46,17 @@ type NewWebhook struct {
 // CreateWebhook has a URL told what becomes of emails. The answer carries
 // the endpoint's signing Secret, the only time it is said. Admin key.
 func (c *Client) CreateWebhook(ctx context.Context, n NewWebhook) (*Webhook, error) {
-	return c.endpoint(ctx, call{method: http.MethodPost, path: []string{"webhooks"}, body: n})
+	return c.secret(ctx, call{method: http.MethodPost, path: []string{"webhooks"}, body: n})
+}
+
+// secret makes a call that answers an endpoint with its signing secret,
+// the one time it is said: an answer without it has lost it.
+func (c *Client) secret(ctx context.Context, k call) (*Webhook, error) {
+	w, err := c.endpoint(ctx, k)
+	if err == nil && w.Secret == "" {
+		return nil, &TransportError{cause: errNotCairnPost}
+	}
+	return w, err
 }
 
 // endpoint makes a call that answers one endpoint.
@@ -55,25 +65,24 @@ func (c *Client) endpoint(ctx context.Context, k call) (*Webhook, error) {
 	if err := c.do(ctx, k, &w); err != nil {
 		return nil, err
 	}
-	if w.ID == "" || !w.whole() {
-		return nil, &TransportError{cause: errNotCairnPost}
-	}
 	return &w, nil
 }
 
 // Webhooks answers every endpoint. Admin key.
 func (c *Client) Webhooks(ctx context.Context) ([]Webhook, error) {
-	var out struct {
-		Data []Webhook `json:"data"`
-	}
-	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"webhooks"}, must: []string{"data"}}, &out); err != nil {
+	var out endpointsAnswer
+	if err := c.do(ctx, call{method: http.MethodGet, path: []string{"webhooks"}}, &out); err != nil {
 		return nil, err
-	}
-	if !each(out.Data, (*Webhook).whole) {
-		return nil, &TransportError{cause: errNotCairnPost}
 	}
 	return out.Data, nil
 }
+
+// endpointsAnswer is the list of every endpoint.
+type endpointsAnswer struct {
+	Data []Webhook `json:"data"`
+}
+
+func (a *endpointsAnswer) whole() bool { return listed(a.Data) }
 
 // Webhook answers one endpoint. Admin key.
 func (c *Client) Webhook(ctx context.Context, id string) (*Webhook, error) {
@@ -133,7 +142,7 @@ type WebhookTest struct {
 // another new secret, and the one the application holds goes on signing
 // for its own time meanwhile. Admin key.
 func (c *Client) RotateWebhookSecret(ctx context.Context, id string) (*Webhook, error) {
-	return c.endpoint(ctx, call{method: http.MethodPost, path: []string{"webhooks", id, "secret"}})
+	return c.secret(ctx, call{method: http.MethodPost, path: []string{"webhooks", id, "secret"}})
 }
 
 // ResumeWebhook ends an endpoint's pause and answers the endpoint: what
@@ -146,10 +155,20 @@ func (c *Client) ResumeWebhook(ctx context.Context, id string) (*Webhook, error)
 // TestWebhook sends the endpoint a signed webhook of type webhook.test
 // now, and answers how it went. Admin key.
 func (c *Client) TestWebhook(ctx context.Context, id string) (*WebhookTest, error) {
-	var t WebhookTest
-	k := call{method: http.MethodPost, path: []string{"webhooks", id, "test"}, must: []string{"delivered"}}
-	if err := c.do(ctx, k, &t); err != nil {
+	var out testedAnswer
+	if err := c.do(ctx, call{method: http.MethodPost, path: []string{"webhooks", id, "test"}}, &out); err != nil {
 		return nil, err
 	}
-	return &t, nil
+	return &WebhookTest{Delivered: *out.Delivered, Status: out.Status, Failure: out.Failure}, nil
 }
+
+// testedAnswer is how a webhook sent to try an endpoint out went. It
+// must say whether it was taken: an answer that does not would read as
+// "it was not".
+type testedAnswer struct {
+	Delivered *bool  `json:"delivered"`
+	Status    int    `json:"status"`
+	Failure   string `json:"failure"`
+}
+
+func (a *testedAnswer) whole() bool { return a.Delivered != nil }

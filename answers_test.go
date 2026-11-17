@@ -3,6 +3,7 @@ package cairnpost
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -101,6 +102,58 @@ func TestARecordWithoutItsTimesIsRefused(t *testing.T) {
 	}
 }
 
+// An answer can be a whole object of CairnPost's kind and still not be
+// the answer to what was asked.
+func TestAnAnswerAboutSomethingElseIsRefused(t *testing.T) {
+	const at = `"created_at":"2030-01-01T00:00:00Z","updated_at":"2030-01-01T00:00:00Z","received_at":"2030-01-01T00:00:00Z","kept_until":"2030-01-01T00:00:00Z"`
+	for name, body := range map[string]string{
+		"Cancel":              `{"id":"req-123","state":"cancelled"}`,
+		"Reschedule":          `{"id":"req-123","scheduled_at":"2030-01-31T08:00:00Z"}`,
+		"Lift":                `{"lifted":0}`,
+		"LiftAll":             `{"lifted":-1}`,
+		"RetryDelivery":       `{"state":"error"}`,
+		"CreateWebhook":       `{"id":"w1",` + at + `}`,
+		"RotateWebhookSecret": `{"id":"w1",` + at + `}`,
+		"Health":              `{"status":"ok"}`,
+		"Webhooks":            `{"data":[{` + at + `}]}`,
+		"Templates":           `{"data":[{` + at + `}]}`,
+		"ReceivedList":        `{"data":[{` + at + `}]}`,
+		"Deliveries":          `{"data":[{` + at + `}]}`,
+		"Suppressions":        `{"data":[{` + at + `}]}`,
+		"Captured":            `{"data":[{"at":"2030-01-01T00:00:00Z"}]}`,
+	} {
+		_, c := serve(t, 200, body)
+		if err := answering[name](ctx, c); !errors.Is(err, errNotCairnPost) {
+			t.Errorf("%s took %s: %v", name, body, err)
+		}
+	}
+	// A value never comes with an error.
+	_, c := serve(t, 200, `{"data":[{"id":"c1"}],"added":"yes","lifted":"7"}`)
+	if held, err := c.Captured(ctx); err == nil || held != nil {
+		t.Errorf("%+v %v", held, err)
+	}
+	if added, err := c.Suppress(ctx, "example.com", "a@example.org", ""); err == nil || added {
+		t.Errorf("%v %v", added, err)
+	}
+	if n, err := c.LiftAll(ctx, "example.com", ""); err == nil || n != 0 {
+		t.Errorf("%v %v", n, err)
+	}
+}
+
+// The table above is held to every call there is: a new call is put in
+// front of the same answers, or this fails.
+func TestEveryCallIsInTheTable(t *testing.T) {
+	// These read no answer of their own: they walk a call that is there.
+	walks := map[string]bool{"AllSuppressions": true, "AllDeliveries": true, "AllReceived": true}
+	of := reflect.TypeOf(&Client{})
+	for i := range of.NumMethod() {
+		name := of.Method(i).Name
+		if _, ok := answering[name]; !ok && !walks[name] {
+			t.Errorf("%s is not in the table of calls", name)
+		}
+	}
+}
+
 // A call that answers nothing is done only on CairnPost's own 204.
 func TestACallThatAnswersNothingWantsA204(t *testing.T) {
 	for _, name := range []string{"DeleteWebhook", "DeleteTemplate", "DeleteReceived"} {
@@ -137,9 +190,6 @@ func TestAnEmptyListAndANoAreStillRead(t *testing.T) {
 	}
 	if n, err := c.LiftAll(ctx, "example.com", ""); err != nil || n != 0 {
 		t.Fatalf("%v %v", n, err)
-	}
-	if err := c.Lift(ctx, "example.com", "a@example.org"); err != nil {
-		t.Fatal(err)
 	}
 	if got, err := c.TestWebhook(ctx, "w"); err != nil || got.Delivered {
 		t.Fatalf("%+v %v", got, err)
