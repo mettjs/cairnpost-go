@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,6 +125,11 @@ func TestAnAnswerTooLargeSaysSo(t *testing.T) {
 	}
 	roomy, _ := New(srv.URL, "key", WithMaxAnswerBytes(1<<20), WithHTTPClient(nil))
 	if held, err := roomy.Captured(ctx); err != nil || len(held) != 1 {
+		t.Fatalf("%v", err)
+	}
+	// The largest number there is means "no limit", not "nothing".
+	all, _ := New(srv.URL, "key", WithMaxAnswerBytes(math.MaxInt64))
+	if held, err := all.Captured(ctx); err != nil || len(held) != 1 {
 		t.Fatalf("%v", err)
 	}
 }

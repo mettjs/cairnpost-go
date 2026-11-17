@@ -9,6 +9,7 @@ package cairnpost
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -63,7 +64,8 @@ func WithHTTPClient(h *http.Client) Option {
 func WithMaxAnswerBytes(n int64) Option {
 	return func(c *Client) {
 		if n > 0 {
-			c.most = n
+			// One byte past the limit is read to know of a longer answer.
+			c.most = min(n, math.MaxInt64-1)
 		}
 	}
 }

@@ -23,6 +23,9 @@ Every change a user of this client can notice is written here. The format is
   large, which lost the status and read as "may have sent" even for a
   404. 64 KiB of a refusal are read, whatever `WithMaxAnswerBytes`
   says.
+- `WithMaxAnswerBytes(math.MaxInt64)`, as "no limit", made every answer
+  read as empty and so refused: a send that went came back as a
+  `*TransportError` with its id lost.
 - `Captured`, asked of a server without that path, answers the error
   that says why when `Health` fails too. It answered "nothing at this
   path" (a wrong base URL by `IsWrongAddress`) also when the server had
