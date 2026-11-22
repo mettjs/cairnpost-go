@@ -6,6 +6,13 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Fixed
+
+- `NewVerifier` refuses a signing secret with a line break inside it, as
+  the Node.js and Python clients do. It took one as the secret it would
+  be without the break. A secret with space or a line break around it is
+  still taken.
+
 ## [0.2.1] - 2026-11-17
 
 ### Fixed
