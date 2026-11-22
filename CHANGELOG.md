@@ -12,6 +12,13 @@ Every change a user of this client can notice is written here. The format is
   the Node.js and Python clients do. It took one as the secret it would
   be without the break. A secret with space or a line break around it is
   still taken.
+- `NewVerifier` drops only a space, a tab or a line break around a
+  signing secret, and so do the Node.js and Python clients now. Each
+  dropped what its own language calls blank space, and the three sets
+  differ: a secret with the character U+0085 after it was taken here and
+  refused by the Node.js client. A secret with any other character
+  around it, a no-break space or a form feed among them, is now refused
+  with `ErrSecret`.
 
 ## [0.2.1] - 2026-11-17
 

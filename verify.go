@@ -49,10 +49,12 @@ type Verifier struct {
 // NewVerifier returns a verifier for an endpoint's signing secret: the
 // "whsec_..." value CreateWebhook answered or, once the secret was
 // changed, the one RotateWebhookSecret did. Each is said only once.
-// Space around it is dropped, as a value read from a file ends in a line
-// break; one with a space or a line break inside it is refused.
+// A space, a tab or a line break around it is dropped, as a value read
+// from a file ends in a line break. Nothing else is: one with any other
+// character around it (a byte order mark, say), or with a space or a line
+// break inside it, is refused.
 func NewVerifier(secret string) (*Verifier, error) {
-	encoded, ok := strings.CutPrefix(strings.TrimSpace(secret), "whsec_")
+	encoded, ok := strings.CutPrefix(strings.Trim(secret, " \t\r\n"), "whsec_")
 	key, whole := decoded(encoded)
 	if !ok || !whole {
 		return nil, ErrSecret
