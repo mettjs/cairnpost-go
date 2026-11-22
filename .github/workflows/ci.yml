@@ -26,3 +26,47 @@ jobs:
           git clone --quiet --filter=blob:none https://github.com/mettjs/CairnPost.git "$RUNNER_TEMP/server"
           git -C "$RUNNER_TEMP/server" checkout --quiet "$(cat testdata/cases/SOURCE)"
           diff -r --exclude=SOURCE --exclude=README.md "$RUNNER_TEMP/server/client-cases" testdata/cases
+
+  integration:
+    name: against a CairnPost server
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: cairnpost
+          POSTGRES_PASSWORD: cairnpost
+          POSTGRES_DB: cairnpost
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U cairnpost -d cairnpost"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      CAIRNPOST_IMAGE: ghcr.io/mettjs/cairnpost:0.1.1
+      CAIRNPOST_POSTGRES_DSN: postgres://cairnpost:cairnpost@127.0.0.1:5432/cairnpost?sslmode=disable
+      CAIRNPOST_INBOUND_SECRET: an-inbound-secret-for-the-tests-0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Start a CairnPost server that sends nothing
+        run: |
+          docker run -d --name cairnpost --network host \
+            -e CAIRNPOST_POSTGRES_DSN -e CAIRNPOST_INBOUND_SECRET \
+            -e CAIRNPOST_DRIVER=capture -e CAIRNPOST_ADDR=127.0.0.1:8025 \
+            -e CAIRNPOST_WEBHOOK_ALLOW_PRIVATE=on -e CAIRNPOST_CONTENT_RETENTION=24h \
+            -e CAIRNPOST_WEBHOOK_POLL=1s "$CAIRNPOST_IMAGE"
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8025/health > /dev/null && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8025/health
+          keys() { docker run --rm --network host -e CAIRNPOST_POSTGRES_DSN "$CAIRNPOST_IMAGE" keys create "$@"; }
+          send=$(keys -name "ci send"); admin=$(keys -name "ci admin" -scope admin)
+          echo "::add-mask::$send"; echo "::add-mask::$admin"
+          { echo "CAIRNPOST_URL=http://127.0.0.1:8025"; echo "CAIRNPOST_SEND_KEY=$send"; echo "CAIRNPOST_ADMIN_KEY=$admin"; } >> "$GITHUB_ENV"
+      # With the tag and without a server these fail rather than skip, and
+      # -v names each one that ran.
+      - run: go test -tags=integration -count=1 -v ./...
+      - if: failure()
+        run: docker logs cairnpost
