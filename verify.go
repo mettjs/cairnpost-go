@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -54,7 +53,7 @@ type Verifier struct {
 // character around it (a byte order mark, say), or with a space or a line
 // break inside it, is refused.
 func NewVerifier(secret string) (*Verifier, error) {
-	encoded, ok := strings.CutPrefix(strings.Trim(secret, " \t\r\n"), "whsec_")
+	encoded, ok := strings.CutPrefix(strings.Trim(secret, around), "whsec_")
 	key, whole := decoded(encoded)
 	if !ok || !whole {
 		return nil, ErrSecret
@@ -97,8 +96,8 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	if id == "" || stamp == "" || signatures == "" {
 		return nil, ErrUnsigned
 	}
-	seconds, err := strconv.ParseInt(stamp, 10, 64)
-	if err != nil {
+	seconds, ok := secondsOf(stamp)
+	if !ok {
 		return nil, ErrUnsigned
 	}
 	mac := hmac.New(sha256.New, v.key)
@@ -106,7 +105,7 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	mac.Write(body)
 	want := mac.Sum(nil)
 	matched := false
-	for _, candidate := range strings.Fields(signatures) {
+	for _, candidate := range strings.FieldsFunc(signatures, isAround) {
 		encoded, isV1 := strings.CutPrefix(candidate, "v1,")
 		got, whole := decoded(encoded)
 		if isV1 && whole && hmac.Equal(got, want) {
@@ -178,15 +177,4 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 // aboutAnEmail are the types that tell of an email that was sent.
 var aboutAnEmail = map[string]bool{
 	EventDelivered: true, EventDeliveryDelays: true, EventBounced: true, EventComplained: true, EventFailed: true,
-}
-
-// signed reads the signature headers under whichever names they came.
-func signed(h http.Header) (id, stamp, signatures string) {
-	for _, prefix := range []string{"webhook-", "svix-"} {
-		id, stamp, signatures = h.Get(prefix+"id"), h.Get(prefix+"timestamp"), h.Get(prefix+"signature")
-		if id != "" && stamp != "" && signatures != "" {
-			return id, stamp, signatures
-		}
-	}
-	return id, stamp, signatures
 }

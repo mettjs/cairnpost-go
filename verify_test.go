@@ -80,3 +80,25 @@ func TestAnEventKeepsItsIDAndEmailAsJSON(t *testing.T) {
 		t.Fatalf("%s -> %+v %v", raw, back, err)
 	}
 }
+
+// A header under two spellings of its name is read the same way every
+// time: the form net/http writes when it is there, as Get would. And a
+// name is the header's only when it is it letter for letter, whatever
+// the case: a long s is not an s.
+func TestAHeaderUnderTwoNamesIsReadTheSameEveryTime(t *testing.T) {
+	rest := func(h http.Header) http.Header {
+		h["webhook-timestamp"], h["webhook-signature"] = []string{"1"}, []string{"s"}
+		return h
+	}
+	for range 100 {
+		if id, _, _ := signed(rest(http.Header{"Webhook-Id": {"as written"}, "WEBHOOK-ID": {"caps"}, "webhook-id": {"small"}})); id != "as written" {
+			t.Fatalf("the id was read from another name: %q", id)
+		}
+		if id, _, _ := signed(rest(http.Header{"WEBHOOK-ID": {"caps"}, "webhook-id": {"small"}})); id != "caps" {
+			t.Fatalf("the id was read from another name: %q", id)
+		}
+	}
+	if id, _, signatures := signed(http.Header{"ſvix-id": {"x"}, "svix-timestamp": {"1"}, "ſvix-ſignature": {"s"}}); id != "" || signatures != "" {
+		t.Errorf("a name with a long s was read as the header's: %q %q", id, signatures)
+	}
+}
