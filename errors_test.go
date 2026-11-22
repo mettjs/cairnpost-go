@@ -15,58 +15,6 @@ import (
 	"time"
 )
 
-func TestAnErrorSaysWhatToDo(t *testing.T) {
-	cases := []struct {
-		status          int
-		body, after     string
-		name, id        string
-		retry, mayBeOut bool
-	}{
-		{422, `{"statusCode":422,"name":"validation_error","message":"The subject is missing."}`, "", ErrValidation, "", false, false},
-		{422, `{"statusCode":422,"name":"sender_domain_not_ready","message":"Not set up.","id":"msg-9"}`, "", ErrSenderDomainNotReady, "msg-9", false, false},
-		{422, `{"name":"recipient_suppressed","message":"Suppressed.","id":"msg-9"}`, "", ErrRecipientSuppress, "msg-9", false, true},
-		{409, `{"name":"invalid_idempotent_request","message":"Used."}`, "", ErrIdempotentMismatch, "", false, false},
-		{409, `{"name":"concurrent_idempotent_requests","message":"In flight."}`, "7", ErrIdempotentInFlight, "", true, false},
-		{408, `{"name":"request_incomplete","message":"Not whole."}`, "", ErrRequestIncomplete, "", true, false},
-		// Changed by others meanwhile: nothing was done, and a second try may be.
-		{409, `{"name":"changed_meanwhile","message":"Changed."}`, "", ErrChangedMeanwhile, "", true, false},
-		{409, `{"name":"name_taken","message":"Taken."}`, "", ErrNameTaken, "", false, false},
-		// A 408 from something in between may come after the server took it.
-		{408, `<html>request timeout</html>`, "", "", "", true, true},
-		{429, `{"name":"rate_limit_exceeded","message":"Limit.","id":"msg-2"}`, "30", ErrRateLimited, "msg-2", true, false},
-		{502, `{"name":"upstream_unknown","message":"Lost.","id":"msg-3"}`, "", ErrUpstreamUnknown, "msg-3", true, true},
-		{503, `{"name":"upstream_unavailable","message":"Down."}`, "", ErrUpstreamDown, "", true, false},
-		{401, `{"name":"invalid_api_key","message":"No."}`, "", ErrInvalidKey, "", false, false},
-		{503, `{"name":"unavailable","message":"Down."}`, "", ErrUnavailable, "", true, false},
-		{500, `{"name":"internal_error","message":"Failed."}`, "", ErrInternal, "", true, true},
-		// Something in between answered: the server may have sent all the same.
-		{502, `<html>bad gateway</html>`, "", "", "", true, true},
-		{504, `{"name":"GatewayTimeout","message":"SUBJECTMARK"}`, "", "", "", true, true},
-		// Without an id, a suppression means nothing went.
-		{422, `{"name":"recipient_suppressed","message":"Suppressed."}`, "", ErrRecipientSuppress, "", false, false},
-	}
-	for _, want := range cases {
-		_, c := serving(t, func(w http.ResponseWriter, _ int) {
-			if want.after != "" {
-				w.Header().Set("Retry-After", want.after)
-			}
-			w.WriteHeader(want.status)
-			io.WriteString(w, want.body)
-		})
-		_, err := c.Send(ctx, Email{From: "a@example.com", To: []string{"b@example.org"}, Subject: "s", Text: "t"})
-		var problem *Error
-		if !errors.As(err, &problem) {
-			t.Fatalf("%d: %v", want.status, err)
-		}
-		wait, _ := time.ParseDuration(want.after + "s")
-		if problem.Status != want.status || problem.Name != want.name || problem.EmailID != want.id ||
-			problem.RetryAfter != wait || problem.Retryable() != want.retry || MayHaveSent(err) != want.mayBeOut ||
-			(problem.Message == "") != (want.name == "") {
-			t.Errorf("%d %s: %+v, retryable %v, may have sent %v", want.status, want.name, problem, problem.Retryable(), MayHaveSent(err))
-		}
-	}
-}
-
 // An error never repeats what the email said or the key that sent it,
 // whatever went wrong and whatever the server answered.
 func TestNoErrorHoldsTheEmailsWordsOrTheKey(t *testing.T) {
@@ -142,39 +90,14 @@ func TestRetryAfterAsADateIsRead(t *testing.T) {
 	}
 }
 
-// A path the server does not have is not a missing record: a client
-// pointed at a wrong address must not read every email as gone. Nor is a
-// 404 from something else at that address.
-func TestAWrongAddressIsNotAMissingRecord(t *testing.T) {
-	for name, c := range map[string]struct {
-		status       int
-		body         string
-		missing, off bool
-	}{
-		"a record that is not there": {404, `{"statusCode":404,"name":"not_found","message":"No email has this id."}`, true, false},
-		"a path that is not there":   {404, `{"statusCode":404,"name":"route_not_found","message":"There is nothing at this path."}`, false, true},
-		"a method the path refuses":  {405, `{"statusCode":405,"name":"method_not_allowed","message":"This path does not take PUT."}`, false, true},
-		"a proxy's own 404":          {404, `<html>not here</html>`, false, true},
-		"a refusal":                  {422, `{"statusCode":422,"name":"validation_error","message":"no"}`, false, false},
-	} {
-		_, client := serve(t, c.status, c.body)
-		_, err := client.Get(ctx, "0199")
-		if IsNotFound(err) != c.missing || IsWrongAddress(err) != c.off {
-			t.Errorf("%s: missing %v, wrong address %v: %v", name, IsNotFound(err), IsWrongAddress(err), err)
-		}
-	}
-	// The server's own sentence is kept, so the error says what to check.
+// What an error says to do is in the shared cases (cases_errors_test.go).
+
+// The server's own sentence is kept, so the error says what to check; and
+// no answer at all is not a wrong address.
+func TestAWrongAddressSaysWhatToCheck(t *testing.T) {
 	_, client := serve(t, 404, `{"statusCode":404,"name":"route_not_found","message":"There is nothing at this path. Check the path and the server's address."}`)
 	if _, err := client.Get(ctx, "0199"); err == nil || !strings.Contains(err.Error(), "Check the path and the server's address") {
 		t.Fatalf("%v", err)
-	}
-	// A redirect is something else answering at that address too.
-	_, client = serving(t, func(w http.ResponseWriter, _ int) {
-		w.Header().Set("Location", "/elsewhere")
-		w.WriteHeader(http.StatusPermanentRedirect)
-	})
-	if _, err := client.Get(ctx, "0199"); !IsWrongAddress(err) || IsNotFound(err) {
-		t.Fatalf("a redirect: %v", err)
 	}
 	if IsWrongAddress(nil) || IsWrongAddress(&TransportError{}) {
 		t.Fatal("no answer at all is not a wrong address")

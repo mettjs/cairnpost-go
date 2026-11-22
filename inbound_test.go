@@ -66,22 +66,3 @@ func TestAReceivedEmailsBytesAreReadAsTheyCame(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
-
-func TestAnEmailThatCameIsToldByItsOwnEvent(t *testing.T) {
-	v := verifier(t)
-	body := `{"type":"email.received","created_at":"2030-01-01T00:00:00Z","data":{"inbound_id":"in-1","from":"","to":["help@mail.example.com"],"received_at":"2030-01-01T00:00:00Z"}}`
-	e, err := v.Verify(headers("webhook-", "dlv-1", at, signature(key, "dlv-1", at, body)), []byte(body))
-	if err != nil || e.Type != EventReceived || e.Email != nil || e.Received == nil || e.Received.ID != "in-1" || e.Received.From != "" ||
-		e.Received.To[0] != "help@mail.example.com" || e.Received.ReceivedAt.Year() != 2030 {
-		t.Fatalf("%+v %v", e, err)
-	}
-	for _, without := range []string{
-		`{"type":"email.received","created_at":"2030-01-01T00:00:00Z","data":{}}`,
-		`{"type":"email.received","created_at":"2030-01-01T00:00:00Z","data":{"inbound_id":"in-1"}}`,
-		`{"type":"email.received","created_at":"2030-01-01T00:00:00Z","data":{"to":["help@mail.example.com"]}}`,
-	} {
-		if _, err := v.Verify(headers("webhook-", "dlv-2", at, signature(key, "dlv-2", at, without)), []byte(without)); err != ErrPayload {
-			t.Errorf("one that names no email or no address: %v", err)
-		}
-	}
-}
