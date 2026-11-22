@@ -52,7 +52,7 @@ func handOver(t *testing.T, raw []byte, to, from string) {
 // webhook the verifier takes, is read with what it says, and a try that
 // failed is tried again when asked.
 func TestAnEmailThatComesAgainstARealServer(t *testing.T) {
-	_, admin := live(t)
+	send, admin := live(t)
 	type arrival struct {
 		header http.Header
 		body   []byte
@@ -112,6 +112,10 @@ func TestAnEmailThatComesAgainstARealServer(t *testing.T) {
 	}
 	if page, err := admin.ReceivedList(ctx, ReceivedQuery{Limit: 1}); err != nil || len(page.Data) != 1 {
 		t.Fatalf("%+v %v", page, err)
+	}
+	// A send key reads none of it.
+	if _, err := send.Received(ctx, id); named(err) != ErrAdminKeyRequired {
+		t.Fatalf("a send key read an email that came: %v", err)
 	}
 
 	// The try that failed is on record, and is tried again when asked.

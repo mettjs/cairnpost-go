@@ -13,10 +13,11 @@ import (
 
 // These tests run against a real CairnPost server: one started with the
 // capture driver and CAIRNPOST_WEBHOOK_ALLOW_PRIVATE=true, so that nothing
-// is sent to anybody and a webhook can reach this machine, and with a
-// CAIRNPOST_INBOUND_SECRET, so that an email can be handed to it. They
-// need its address, two keys and that secret, and fail without them
-// rather than skip.
+// is sent to anybody and a webhook can reach this machine, with a
+// CAIRNPOST_CONTENT_RETENTION, so that a file it kept can be read back,
+// and with a CAIRNPOST_INBOUND_SECRET, so that an email can be handed to
+// it. They need its address, two keys and that secret, and fail without
+// them rather than skip.
 func live(t *testing.T) (send, admin *Client) {
 	t.Helper()
 	base, sendKey, adminKey := os.Getenv("CAIRNPOST_URL"), os.Getenv("CAIRNPOST_SEND_KEY"), os.Getenv("CAIRNPOST_ADMIN_KEY")
@@ -194,17 +195,13 @@ func TestSendingAgainstARealServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A server that keeps emails' files gives one back; one that does not
-	// says there is none.
-	back, err := admin.FileContent(ctx, filed.ID, 1)
-	if m, getErr := admin.Get(ctx, filed.ID); getErr != nil {
-		t.Fatal(getErr)
-	} else if m.Content != nil && len(m.Content.Attachments) == 1 && m.Content.Attachments[0].Kept {
-		if err != nil || string(back) != "hello" {
-			t.Fatalf("the kept file: %q %v", back, err)
-		}
-	} else if !IsNotFound(err) {
-		t.Fatalf("a file that is not kept: %v", err)
+	// The server keeps what it sends, so the file is said to be kept and
+	// is given back.
+	if m, err := admin.Get(ctx, filed.ID); err != nil || m.Content == nil || len(m.Content.Attachments) != 1 || !m.Content.Attachments[0].Kept {
+		t.Fatalf("%+v %v (the server needs a CAIRNPOST_CONTENT_RETENTION)", m, err)
+	}
+	if back, err := admin.FileContent(ctx, filed.ID, 1); err != nil || string(back) != "hello" {
+		t.Fatalf("the kept file: %q %v", back, err)
 	}
 	if _, err := send.FileContent(ctx, filed.ID, 1); err == nil {
 		t.Fatal("a send key read a file")
