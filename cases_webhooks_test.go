@@ -78,9 +78,11 @@ func TestAWebhookIsReadOnlyWhenItIsTheEndpoints(t *testing.T) {
 		}
 		v.Now = func() time.Time { return time.Unix(file.Now, 0) }
 		v.Tolerance = time.Duration(c.Tolerance) * time.Second
+		// Under the names as the case writes them, not as Set would: a
+		// header is not always one net/http made.
 		header := http.Header{}
 		for name, value := range c.Headers {
-			header.Set(name, value)
+			header[name] = []string{value}
 		}
 		e, err := v.Verify(header, []byte(c.Body))
 		want, refused := refusals[c.Want.Refused]

@@ -12,6 +12,23 @@ import (
 	"strings"
 )
 
+// around is what is dropped around an API key, a signing secret and the
+// value of a signature header: what a file or a header puts there, and
+// no more. A language's own blank space is wider, and differs from the
+// next language's, and one value must read the same in every client.
+const around = " \t\r\n"
+
+// keyLike says a text could be an API key: not empty, and printable
+// ASCII with no space in it.
+func keyLike(v string) bool {
+	for i := 0; i < len(v); i++ {
+		if v[i] < 0x21 || v[i] > 0x7e {
+			return false
+		}
+	}
+	return v != ""
+}
+
 // headerSafe says a value can be sent as a header as it is: printable,
 // with no space at either end.
 func headerSafe(v string) bool {

@@ -6,6 +6,30 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+### Fixed
+
+- One value is now read the same way by this client and by the Node.js
+  and Python ones. Around an API key, and around the id, the timestamp
+  and the signatures of a webhook, a space, a tab or a line break is
+  dropped and nothing else is.
+  - `New` refuses a key with a space inside it, or with a character
+    outside printable ASCII anywhere in it (a byte order mark in front,
+    say). It took such a key and sent it as it was, so every call was
+    refused by the server instead. It also dropped other blank
+    characters around a key (a no-break space, a form feed), which the
+    other clients did not all do.
+  - `Verify` reads a webhook whose id or timestamp has a space, a tab or
+    a line break around it, as the other clients do. It refused one.
+  - `Verify` finds the signature headers under names in any case, as the
+    other clients do. A header not made by `net/http`, with its names in
+    small letters, was refused as unsigned.
+  - `Verify` refuses a timestamp that is not one to fifteen digits, as
+    the other clients do. It took one with a sign in front or with more
+    digits.
+  - `Verify` takes two signatures as two only when a space, a tab or a
+    line break stands between them. Other blank characters (a no-break
+    space, a vertical tab) also passed for a gap.
+
 ## [0.2.2] - 2026-11-22
 
 ### Fixed

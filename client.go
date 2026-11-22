@@ -82,17 +82,19 @@ func WithUserAgent(name string) Option {
 
 // New returns a client for the server at baseURL ("https://mail.example.com")
 // using apiKey. A send key may send and read its own emails; the calls
-// marked "admin key" need an admin key.
+// marked "admin key" need an admin key. A space, a tab or a line break
+// around the key is dropped, as a value read from a file ends in a line
+// break; a key with anything else in it that no key has is refused.
 func New(baseURL, apiKey string, opts ...Option) (*Client, error) {
 	u, err := url.Parse(strings.TrimRight(baseURL, "/"))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, errors.New("cairnpost: the base URL must be http:// or https:// and name a host")
 	}
 	// A key read from a file often ends in a newline; one with anything
-	// else a header cannot carry is refused here, not at the first call.
-	apiKey = strings.TrimSpace(apiKey)
-	if apiKey == "" || !headerSafe(apiKey) {
-		return nil, errors.New("cairnpost: an API key is required, and holds no spaces or control characters")
+	// else in it that no key has is refused here, not at the first call.
+	apiKey = strings.Trim(apiKey, around)
+	if !keyLike(apiKey) {
+		return nil, errors.New("cairnpost: an API key is required, and holds only printable ASCII characters, with no spaces")
 	}
 	own := &http.Client{Timeout: DefaultTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
