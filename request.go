@@ -29,15 +29,17 @@ func keyLike(v string) bool {
 	return v != ""
 }
 
-// headerSafe says a value can be sent as a header as it is: printable,
-// with no space at either end.
+// headerSafe says a value can be sent as a header as it is: printable
+// ASCII, in one line, with no space at either end. Anything else is
+// dropped or changed on the way by one thing or another, and the server
+// takes nothing else in an Idempotency-Key.
 func headerSafe(v string) bool {
-	for _, r := range v {
-		if r < 0x20 || r == 0x7f {
+	for i := 0; i < len(v); i++ {
+		if v[i] < 0x20 || v[i] > 0x7e {
 			return false
 		}
 	}
-	return v == strings.TrimSpace(v)
+	return v == strings.Trim(v, " ")
 }
 
 // errTooLarge is an answer longer than the client reads.

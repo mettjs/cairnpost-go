@@ -70,9 +70,10 @@ error when nobody in `To` or `Cc` is left: a `Bcc` alone is not sent.
 
 **Use an `IdempotencyKey` for anything you may retry.** The same key with
 the same content, sent again, is the same email: the retry answers the
-first one's id and sends nothing. An empty key is no key at all, and the
-send is then not idempotent: make sure yours is not empty when it is put
-together from other values.
+first one's id and sends nothing. A key is printable ASCII with no space
+at either end; a send with any other key is an error, and nothing is
+sent. An empty key is no key at all, and the send is then not idempotent:
+make sure yours is not empty when it is put together from other values.
 
 Several emails go in one request with `SendBatch`:
 
@@ -433,7 +434,7 @@ l, err := client.Limits(ctx) // l.Quota is nil for a provider with no allowance
 | Option | Does |
 |---|---|
 | `WithHTTPClient(h)` | Call through your own `http.Client`. Keep its timeout above the server's send timeout, and do not let it follow redirects. |
-| `WithUserAgent(name)` | Put your application's name before the client's in `User-Agent`. |
+| `WithUserAgent(name)` | Put your application's name before the client's in `User-Agent`. A name that is not printable ASCII is left out. |
 | `WithMaxAnswerBytes(n)` | How much of an answer is read (64 MiB by default). A larger one is an error that says so. A refusal is not counted: 64 KiB of one are read, and a longer one is its status alone. |
 
 ## Contributing

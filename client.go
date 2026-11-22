@@ -71,7 +71,8 @@ func WithMaxAnswerBytes(n int64) Option {
 }
 
 // WithUserAgent puts the application's name before the client's own in the
-// User-Agent header. A name a header cannot carry is ignored.
+// User-Agent header. A name a header cannot carry as it is, which is
+// anything but printable ASCII, is ignored.
 func WithUserAgent(name string) Option {
 	return func(c *Client) {
 		if name != "" && headerSafe(name) {

@@ -37,9 +37,10 @@ type Email struct {
 	ScheduledAt time.Time
 	// IdempotencyKey makes a repeated send one email: the same key with
 	// the same content answers the first one's id. Use one for anything
-	// that may be retried. It is remembered for a day by default. An
-	// empty key is no key: check that yours is not empty when it is made
-	// from other values.
+	// that may be retried. It is remembered for a day by default. A key
+	// is printable ASCII with no space at either end; any other is
+	// refused before anything is sent. An empty key is no key: check
+	// that yours is not empty when it is made from other values.
 	IdempotencyKey string
 }
 
@@ -113,7 +114,7 @@ func (c *Client) Send(ctx context.Context, e Email) (*Sent, error) {
 		// A key a header cannot carry as it is would be dropped or changed
 		// on the way, and the send would quietly not be idempotent.
 		if !headerSafe(e.IdempotencyKey) {
-			return nil, errors.New("cairnpost: the IdempotencyKey must have no control characters and no space at either end; nothing was sent")
+			return nil, errors.New("cairnpost: the IdempotencyKey must be printable ASCII, with no space at either end; nothing was sent")
 		}
 		k.header = http.Header{"Idempotency-Key": {e.IdempotencyKey}}
 	}
