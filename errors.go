@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -96,7 +95,8 @@ type Error struct {
 	// earlier try under the same Idempotency-Key that may have gone.
 	EmailID string
 	// RetryAfter is how long the server asked to wait; zero when it did
-	// not say.
+	// not say. It is whole seconds, at least one and never more than
+	// about 31 years: a wait outside that is read as none.
 	RetryAfter time.Duration
 }
 
@@ -146,16 +146,4 @@ func problemOf(res *http.Response, raw []byte) *Error {
 	}
 	e.RetryAfter = waitOf(res)
 	return e
-}
-
-// waitOf is how long an answer asks to wait, zero when it does not say.
-// Retry-After is seconds from CairnPost, and may be a date from a proxy.
-func waitOf(res *http.Response) time.Duration {
-	after := res.Header.Get("Retry-After")
-	if secs, err := strconv.Atoi(after); err == nil && secs > 0 {
-		return time.Duration(secs) * time.Second
-	} else if at, err := http.ParseTime(after); err == nil && time.Until(at) > 0 {
-		return time.Until(at).Round(time.Second)
-	}
-	return 0
 }

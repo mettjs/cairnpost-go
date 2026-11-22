@@ -2,6 +2,7 @@ package cairnpost
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -70,7 +71,7 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 			// is believed, as for an answer that is not CairnPost's.
 			if known[d.Error.Name] {
 				problem.Name, problem.Message, problem.EmailID = d.Error.Name, d.Error.Message, d.Error.ID
-				problem.RetryAfter = time.Duration(max(d.Error.Wait, 0)) * time.Second
+				problem.RetryAfter = waitSaid(d.Error.Wait)
 			}
 			results[i].Err = problem
 		case d.Error == nil && d.ID != "" && d.At.IsZero() == b.Emails[i].ScheduledAt.IsZero():
@@ -93,7 +94,9 @@ type batchAnswer struct {
 			Name    string `json:"name"`
 			Message string `json:"message"`
 			ID      string `json:"id"`
-			Wait    int    `json:"retry_after"`
+			// Read as it was written: a wait that is no number is no
+			// wait, not an answer that cannot be read.
+			Wait json.RawMessage `json:"retry_after"`
 		} `json:"error"`
 	} `json:"data"`
 }

@@ -8,6 +8,31 @@ Every change a user of this client can notice is written here. The format is
 
 ### Fixed
 
+- `Error.RetryAfter` is read by one rule, the same in the Node.js and
+  Python clients. A wait is 1 to 9 digits of seconds in the
+  `Retry-After` header, or a date there exactly as HTTP writes one now
+  (`Sun, 06 Nov 1994 08:49:37 GMT`), and is at least a second and at
+  most 999,999,999 seconds. Anything else is no wait.
+  - A number with a sign in front (`+7`) was read as a wait. A number
+    of more than nine digits was read too, and a large one came out as
+    a wait of thousands of years, or as a negative one.
+  - A date in one of the two older forms HTTP once wrote
+    (`Sunday, 06-Nov-94 08:49:37 GMT`, `Sun Nov  6 08:49:37 1994`) is no
+    longer read, nor one with its names in other letters, with a space
+    too many, or with the wrong day of the week. The other clients
+    never read those.
+  - The wait until a date is counted in whole seconds, a part of one as
+    a whole one, so that a caller never comes back early. It was
+    rounded to the nearest.
+  - An answer with two `Retry-After` headers is read as the other
+    clients are handed it: the two values as one, with a comma between.
+    Two waits said so are none. The first was read alone.
+  - In `SendBatch`, a `retry_after` too large for an email's error gave
+    it a negative `RetryAfter`. One that was not a whole number (`7.5`,
+    or a text) made the whole answer unreadable: `SendBatch` failed
+    with an error that says the emails may have gone. Anything that is
+    not a whole number of seconds is now no wait, and the answer is
+    read.
 - `Send` and `SendBatch` refuse an `IdempotencyKey` with a character
   outside printable ASCII, before anything is sent, as the Node.js and
   Python clients do. Such a key was sent as it was, and the server takes

@@ -15,8 +15,8 @@ import (
 // The files in testdata/cases are the cases every CairnPost client is
 // held to, whatever language it is written in: what each call sends, the
 // answers a client must take and those it must refuse, what an error
-// says to do, which API keys and idempotency keys it takes, and which
-// webhooks are the endpoint's. They are a copy of
+// says to do and how long to wait, which API keys and idempotency keys
+// it takes, and which webhooks are the endpoint's. They are a copy of
 // the server's own (client-cases in its repository) and are changed
 // there, never here. The tests in cases_*_test.go run them.
 
