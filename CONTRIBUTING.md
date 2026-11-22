@@ -37,7 +37,9 @@ export CAIRNPOST_INBOUND_SECRET=...   # the one the server was started with
 go test -tags=integration -count=1 ./...
 ```
 
-With the tag and without those variables they fail rather than skip.
+With the tag and without those variables they fail rather than skip. CI
+runs all of the above, the integration tests against the server's
+published image.
 
 ## Conventions
 
