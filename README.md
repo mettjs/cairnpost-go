@@ -14,7 +14,7 @@ webhooks CairnPost sends.
 
 It uses the standard library only, and needs the Go version `go.mod` names.
 
-**Status: early.** It follows the server release by release: this is 0.2.1,
+**Status: early.** It follows the server release by release: this is 0.2.2,
 for CairnPost 0.1.1. The [changelog](CHANGELOG.md) says what exists.
 
 ```sh
