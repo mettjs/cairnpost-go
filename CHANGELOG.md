@@ -8,6 +8,13 @@ Every change a user of this client can notice is written here. The format is
 
 ### Fixed
 
+- `Send` and `SendBatch` refuse an `IdempotencyKey` with a character
+  outside printable ASCII, before anything is sent, as the Node.js and
+  Python clients do. Such a key was sent as it was, and the server takes
+  only printable ASCII in one. A key with a control character, or with a
+  space at either end, was refused already.
+- `WithUserAgent` ignores a name with a character outside printable
+  ASCII, as the other clients do. It was put in the header as it was.
 - One value is now read the same way by this client and by the Node.js
   and Python ones. Around an API key, and around the id, the timestamp
   and the signatures of a webhook, a space, a tab or a line break is

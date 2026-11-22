@@ -15,6 +15,8 @@ type Batch struct {
 	// server remembers each email under the key and its place, so a
 	// second try sends only what did not go. Send the same emails in the
 	// same order. An email's own IdempotencyKey is not used in a batch.
+	// A key is printable ASCII with no space at either end; any other is
+	// refused before anything is sent.
 	IdempotencyKey string
 }
 
@@ -47,7 +49,7 @@ func (c *Client) SendBatch(ctx context.Context, b Batch) ([]BatchResult, error) 
 	k := call{method: http.MethodPost, path: []string{"emails", "batch"}, body: body}
 	if b.IdempotencyKey != "" {
 		if !headerSafe(b.IdempotencyKey) {
-			return nil, errors.New("cairnpost: the IdempotencyKey must have no control characters and no space at either end; nothing was sent")
+			return nil, errors.New("cairnpost: the IdempotencyKey must be printable ASCII, with no space at either end; nothing was sent")
 		}
 		k.header = http.Header{"Idempotency-Key": {b.IdempotencyKey}}
 	}

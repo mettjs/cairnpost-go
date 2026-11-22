@@ -27,8 +27,9 @@ type stand struct {
 
 func (s *stand) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
+	// Every value of the key's header, so that one sent twice is seen.
 	s.seen = append(s.seen, seen{r.Method, r.URL.Path, r.URL.EscapedPath(), r.URL.RawQuery, r.Header.Get("Authorization"),
-		r.Header.Get("Idempotency-Key"), r.Header.Get("User-Agent"), r.Header.Get("Content-Type"), string(body)})
+		strings.Join(r.Header.Values("Idempotency-Key"), ", "), r.Header.Get("User-Agent"), r.Header.Get("Content-Type"), string(body)})
 	s.answer(w, len(s.seen))
 }
 
@@ -81,6 +82,32 @@ func TestABaseURLWithAPathIsKept(t *testing.T) {
 	}
 	if _, err := c.Get(ctx, "m"); err != nil || s.seen[0].path != "/mail/emails/m" || !strings.HasPrefix(s.seen[0].agent, "billing/2 cairnpost-go/") {
 		t.Fatalf("%v %+v", err, s.seen[0])
+	}
+}
+
+// An application's name goes before the client's own when a header can
+// carry it as it is, and is left out otherwise: a line break, a space at
+// an end, or anything but printable ASCII.
+func TestAnApplicationsNameIsSentOnlyWhenAHeaderCanCarryIt(t *testing.T) {
+	for name, sent := range map[string]bool{
+		"billing/2": true, "billing 2 (worker)": true,
+		"bad\nname": false, " billing": false, "billing ": false, "caf\xc3\xa9/2": false, "billing\xc2\xa0/2": false, "": false,
+	} {
+		s, standing := serve(t, http.StatusOK, up)
+		c, err := New(standing.base.String(), "key", WithUserAgent(name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.Health(ctx); err != nil || len(s.seen) != 1 {
+			t.Fatalf("%q: %d requests, %v", name, len(s.seen), err)
+		}
+		want := "cairnpost-go/" + Version
+		if sent {
+			want = name + " " + want
+		}
+		if got := s.seen[0].agent; got != want {
+			t.Errorf("with the name %q the header was %q, not %q", name, got, want)
+		}
 	}
 }
 
