@@ -49,13 +49,26 @@ type Verifier struct {
 // NewVerifier returns a verifier for an endpoint's signing secret: the
 // "whsec_..." value CreateWebhook answered or, once the secret was
 // changed, the one RotateWebhookSecret did. Each is said only once.
+// Space around it is dropped, as a value read from a file ends in a line
+// break; one with a space or a line break inside it is refused.
 func NewVerifier(secret string) (*Verifier, error) {
 	encoded, ok := strings.CutPrefix(strings.TrimSpace(secret), "whsec_")
-	key, err := base64.StdEncoding.DecodeString(encoded)
-	if !ok || err != nil || len(key) == 0 {
+	key, whole := decoded(encoded)
+	if !ok || !whole {
 		return nil, ErrSecret
 	}
 	return &Verifier{key: key}, nil
+}
+
+// decoded reads base64, and says whether it was that, unbroken, and held
+// anything. The decoder alone skips carriage returns and line breaks, so
+// a value broken across lines would pass for one it is not.
+func decoded(encoded string) ([]byte, bool) {
+	if strings.ContainsAny(encoded, "\r\n") {
+		return nil, false
+	}
+	raw, err := base64.StdEncoding.DecodeString(encoded)
+	return raw, err == nil && len(raw) > 0
 }
 
 // Verify checks a webhook and reads it. body must be the request's body
@@ -93,8 +106,8 @@ func (v *Verifier) Verify(header http.Header, body []byte) (*Event, error) {
 	matched := false
 	for _, candidate := range strings.Fields(signatures) {
 		encoded, isV1 := strings.CutPrefix(candidate, "v1,")
-		got, err := base64.StdEncoding.DecodeString(encoded)
-		if isV1 && err == nil && hmac.Equal(got, want) {
+		got, whole := decoded(encoded)
+		if isV1 && whole && hmac.Equal(got, want) {
 			matched = true
 		}
 	}
