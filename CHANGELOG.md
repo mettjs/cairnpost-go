@@ -14,10 +14,12 @@ Every change a user of this client can notice is written here. The format is
   dropped and nothing else is.
   - `New` refuses a key with a space inside it, or with a character
     outside printable ASCII anywhere in it (a byte order mark in front,
-    say). It took such a key and sent it as it was, so every call was
-    refused by the server instead. It also dropped other blank
-    characters around a key (a no-break space, a form feed), which the
-    other clients did not all do.
+    say). It took such a key and sent it as it was, which is no key to
+    a server; the other clients refuse one when the client is made. A
+    key with another blank character around it (a no-break space, a
+    form feed, the character U+0085) is refused too. `New` dropped
+    those, and the clients did not all drop the same ones: the Node.js
+    client refused a key with U+0085 after it.
   - `Verify` reads a webhook whose id or timestamp has a space, a tab or
     a line break around it, as the other clients do. It refused one.
   - `Verify` finds the signature headers under names in any case, as the
