@@ -44,6 +44,12 @@ With the tag and without those variables they fail rather than skip.
 - **The standard library only.**
 - **The latest stable Go**, as `go.mod` names it.
 - **Errors say what to do**, and never echo the server's raw answer.
+- **The shared cases are a copy.** `testdata/cases` holds the cases every
+  CairnPost client is held to, copied from
+  [`client-cases`](https://github.com/mettjs/CairnPost/tree/main/client-cases)
+  in the server's repository at the commit `testdata/cases/SOURCE` names. A
+  case is changed there, never here; a new call is added to the table in
+  `cases_table_test.go`. CI compares the copy with that commit.
 - **Documentation is true now.** A change to what the client does updates
   the README and the changelog with it.
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
