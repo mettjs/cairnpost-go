@@ -6,6 +6,8 @@ Every change a user of this client can notice is written here. The format is
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-22
+
 ### Fixed
 
 - `Error.RetryAfter` is read by one rule, the same in the Node.js and
@@ -222,7 +224,8 @@ Every change a user of this client can notice is written here. The format is
   delivers for real.
 - Options: `WithHTTPClient`, `WithUserAgent`, `WithMaxAnswerBytes`.
 
-[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/mettjs/cairnpost-go/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/mettjs/cairnpost-go/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/mettjs/cairnpost-go/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/mettjs/cairnpost-go/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mettjs/cairnpost-go/compare/v0.1.2...v0.2.0
