@@ -45,7 +45,7 @@ published image.
 
 - **One file per part of the API**, small, with its tests beside it.
 - **The standard library only.**
-- **The latest stable Go**, as `go.mod` names it.
+- **Go 1.27**, as `go.mod` names it.
 - **Errors say what to do**, and never echo the server's raw answer.
 - **The shared cases are a copy.** `testdata/cases` holds the cases every
   CairnPost client is held to, copied from
